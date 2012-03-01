@@ -4,20 +4,28 @@ import Control.Applicative
 import Data.Fixed
 import Data.List
 
-type Range = (Double, Double)
+data Event a = Event {onset :: Double, duration :: Maybe Double, value :: a}
 
-type Event a = (Double, a)
+instance Functor Event where
+  fmap f e = e {value = (fmap f value e)}
 
-data Pattern a = Pattern {events :: [Event a], period :: Double}
-               | PatternCat [Pattern a]
+instance (Show a) => Show (Event a) where
+  show e = show $ value e
+
+data Pattern a = Pattern {events :: [Event a], periodP :: Double}
+--               | PatternCat [Pattern a]
                | PatternCombo [Pattern a]
-               | PatternFunc {func :: (Double -> a), period :: Double}
+
+data Signal a = Signal {func :: (Double -> a), periodS :: Double}
 
 instance Functor Pattern where
-  fmap f p@(Pattern {events = e}) = p {events = fmap (mapSnd f) e}
-  fmap f (PatternCat ps)   = PatternCat   $ fmap (fmap f) ps
+  fmap f p@(Pattern {events = e}) = p {events = fmap (fmap f) e}
+--  fmap f (PatternCat ps)   = PatternCat   $ fmap (fmap f) ps
   fmap f (PatternCombo ps) = PatternCombo $ fmap (fmap f) ps
 
+instance Functor Signal where  
+  fmap f s@(Signal _ _) = s {func = fmap f (func s)}
+  
 -- instance Applicative Pattern where
 --  pure x = Pattern {events = [(0,x)], period = 1}
 --  Pattern fs pf <*> Pattern xs px = Pattern (liftA2 (<*>) fs xs) (min pf px)
@@ -35,8 +43,13 @@ class Patternable p where
 
 instance Patternable [] where
   pattern xs = Pattern r 1
-    where r = map (\x -> ((fromIntegral x) / (fromIntegral $ length xs),
-                          xs !! x)) [0 .. (length xs) - 1]
+    where 
+      r = map (\x -> Event {onset = (fromIntegral x) / 
+                                    (fromIntegral $ length xs),
+                            duration = Nothing,
+                            value = xs !! x
+                           }
+              ) [0 .. (length xs) - 1]
 
 
 rev :: Pattern a -> Pattern a
@@ -55,21 +68,25 @@ every n f p = cat $ (take (n-1) $ repeat p) ++ [f p]
 
 cat :: [Pattern a] -> Pattern a
 cat ps = Pattern (concatMap events ps') n
-  where shrunk = map (\p -> mapTime (* ((period p) / n)) p) ps
-        withOffsets = zip (0:(map (\p -> (period p) / n) shrunk)) shrunk
+  where shrunk = map (\p -> mapTime (* ((periodP p) / n)) p) ps
+        withOffsets = zip (0:(map (\p -> (periodP p) / n) shrunk)) shrunk
         ps' = map (\(o, p) -> mapTime (+ o) p) $ accumFst withOffsets
-        n = (sum $ (map period) ps)
+        n = (sum $ (map periodP) ps)
 
-cat' :: [Pattern a] -> Pattern a
-cat' ps = Pattern (concatMap events ps') n
-  where ps' = map (\(p, d) -> mapTime (+ (fromIntegral d)) p) $ zip ps [0 ..]
-        n = (sum $ (map period) ps)
+combine :: [Pattern a] -> Pattern a
+combine = PatternCombo
+
+accumOnsets :: [Event a] -> [Event a]
+accumOnsets = scanl1 (\a b -> mapOnset (+ (onset a)) b)
+
+mapOnset :: (Double -> Double) -> Event a -> Event a
+mapOnset f e = e {onset = f $ onset e}
 
 accumFst :: [(Double, a)] -> [(Double, a)]
 accumFst = scanl1 (\a b -> mapFst (+ (fst a)) b)
 
 mapTime :: (Double -> Double) -> Pattern a -> Pattern a
-mapTime f p = p {events = map (mapFst f) (events p)}
+mapTime f p = p {events = map (mapOnset f) (events p)}
 
 sinewave :: Int -> [Double]
 sinewave n =  map (\x -> sin (step * fromIntegral x)) [0 .. n-1]
