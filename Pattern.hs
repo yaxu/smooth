@@ -3,11 +3,12 @@ module Pattern where
 import Control.Applicative
 import Data.Fixed
 import Data.List
+import Data.Maybe
 
-data Event a = Event {duration :: Maybe Double, value :: a}
+data Event a = Event {duration :: Maybe Double, value :: Maybe a}
 
 instance Functor Event where
-  fmap f e = e {value = (fmap f value e)}
+  fmap f e = e {value = (fmap (fmap f) value e)}
 
 instance (Show a) => Show (Event a) where
   show e = show $ value e
@@ -44,7 +45,7 @@ instance Patternable [] where
                                    (fromIntegral $ length xs),
                            event = Event {
                              duration = Nothing,
-                             value = xs !! x
+                             value = Just $ xs !! x
                              }
                           }
               ) [0 .. (length xs) - 1]
@@ -101,11 +102,11 @@ combine = Combo
 sample :: Int -> Signal a -> Pattern a
 sample n s = Cycle ps 1 1
   where ps =
-          map (\x -> 
+          map (\x ->
                 Atom {
                   event = (Event {
                               duration = Nothing,
-                              value = (s $ (fromIntegral x) / (fromIntegral n))
+                              value = Just (s $ (fromIntegral x) / (fromIntegral n))
                               }
                           ),
                   onset = (fromIntegral x) / (fromIntegral n)
@@ -131,9 +132,37 @@ modulateOnset f s p = mapOnset (\x -> f (s x) x) p
 wobble :: Double -> Pattern a -> Pattern a
 wobble d p = modulateOnset (+) (fmap (*d) sinewave) p
 
-flatten :: (Double, Double) -> Pattern a -> Pattern a
-flatten (startCycle, endCycle) p =
+flatten :: (Double, Double) -> Pattern a -> Maybe (Pattern a)
+flatten (start, end) p@(Atom {onset = o})
+  | and [o > start, o < end] = Just p
+  | otherwise = Nothing
+flatten r p@(Combo ps) = if (null $ patterns p') then Nothing else Just p'
+  where p' = Combo $ catMaybes $ map (flatten r) ps
 
+flatten (start, end) p@(Cycle ps e r)
+  | end < start = Nothing
+  | otherwise = Just p
+  where cycles = map
+                 (\offset -> (fromIntegral offset, p))
+                 [floor start .. ceiling end]
+        flat = map
+               (\(o, p) -> (o, flatten (max (start - o) 0, min (end - o) 1) p))
+               cycles
+{-
+        totalSize = sum $ map size ps
+        positions = map (/ totalSize) $ scanl (+) 0 (map size ps)
+        ranges = zip (zip (positions) (tail positions)) ps
+        startCycle = mod' start 1
+        duration = end - start
+        deltaCycle = startCycle + duration
+        endCycle = mod' end 1
+        h = filter (\((s, e), p) -> s > startCycle && e < deltaCycle) ranges
+        t | (startCycle + duration) < 1 = filter (\((s, e), p) -> e < endCycle) ranges
+          | otherwise = []
+-}
+
+accumFst :: [(Double, a)] -> [(Double, a)]
+accumFst = scanl1 (\a b -> mapFst (+ (fst a)) b)
 
 
 --modulate :: (a -> b -> c) -> Pattern a -> Signal b -> Pattern c
