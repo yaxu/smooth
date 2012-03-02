@@ -14,7 +14,7 @@ instance (Show a) => Show (Event a) where
 
 data Pattern a = Atom {event :: Event a, onset :: Double}
                | Cycle {patterns :: [Pattern a],
-                        --density :: Double,
+                        extent :: Double,
                         reps :: Double}
                | Combo {patterns :: [Pattern a]}
 
@@ -25,7 +25,7 @@ instance Functor Pattern where
 
 instance (Show a) => Show (Pattern a) where
   show (Atom e o) = show e ++ "@" ++ show o
-  show (Cycle ps r) =
+  show (Cycle ps e r) =
     (show r) ++ " x (" ++ (intercalate " " (map show ps)) ++ ")"
   show (Combo ps) = intercalate ", " (map show ps)
 
@@ -38,7 +38,7 @@ class Patternable p where
   pattern :: p a -> Pattern a
 
 instance Patternable [] where
-  pattern xs = Cycle r 1
+  pattern xs = Cycle r 1 (fromIntegral $ length xs)
     where
       r = map (\x -> Atom {onset = (fromIntegral x) /
                                    (fromIntegral $ length xs),
@@ -48,6 +48,12 @@ instance Patternable [] where
                              }
                           }
               ) [0 .. (length xs) - 1]
+
+size :: Pattern a -> Double
+size (Atom {})  = 1
+size (Cycle {extent = e, reps = r}) = e * r
+size (Combo []) = 0
+size (Combo ps) = maximum $ map size ps
 
 mapAtom :: (Pattern a -> Pattern b) -> Pattern a -> Pattern b
 mapAtom f p@(Atom _ _) = f p
@@ -74,7 +80,7 @@ every 0 _ p = p
 every n f p = cat $ (take (n-1) $ repeat p) ++ [f p]
 
 cat :: [Pattern a] -> Pattern a
-cat ps = Cycle ps 1
+cat ps = Cycle ps 1 1
 
 --cat :: [Pattern a] -> Pattern a
 --cat ps = Cycle (concatMap events ps') n
@@ -91,6 +97,21 @@ combine = Combo
 
 --accumFst :: [(Double, a)] -> [(Double, a)]
 --accumFst = scanl1 (\a b -> mapFst (+ (fst a)) b)
+
+sample :: Int -> Signal a -> Pattern a
+sample n s = Cycle ps 1 1
+  where ps =
+          map (\x -> 
+                Atom {
+                  event = (Event {
+                              duration = Nothing,
+                              value = (s $ (fromIntegral x) / (fromIntegral n))
+                              }
+                          ),
+                  onset = (fromIntegral x) / (fromIntegral n)
+                  }
+              )
+          [0 .. (n - 1)]
 
 sinewave :: Signal Double
 sinewave = sin . (pi * 2 *)
@@ -110,8 +131,8 @@ modulateOnset f s p = mapOnset (\x -> f (s x) x) p
 wobble :: Double -> Pattern a -> Pattern a
 wobble d p = modulateOnset (+) (fmap (*d) sinewave) p
 
---flatten :: (Double, Double) -> Pattern a -> Pattern a
---flatten (startCycle, endCycle) p =
+flatten :: (Double, Double) -> Pattern a -> Pattern a
+flatten (startCycle, endCycle) p =
 
 
 
