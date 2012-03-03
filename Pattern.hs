@@ -15,8 +15,7 @@ instance (Show a) => Show (Event a) where
 
 data Pattern a = Atom {event :: Event a, onset :: Double}
                | Cycle {patterns :: [Pattern a],
-                        extent :: Double,
-                        reps :: Double}
+                        extent :: Double}
                | Combo {patterns :: [Pattern a]}
 
 instance Functor Pattern where
@@ -26,8 +25,8 @@ instance Functor Pattern where
 
 instance (Show a) => Show (Pattern a) where
   show (Atom e o) = show e ++ "@" ++ show o
-  show (Cycle ps e r) =
-    (show r) ++ " x (" ++ (intercalate " " (map show ps)) ++ ")"
+  show (Cycle ps e) =
+    (show e) ++ " x (" ++ (intercalate " " (map show ps)) ++ ")"
   show (Combo ps) = intercalate ", " (map show ps)
 
 type Signal a = (Double -> a)
@@ -39,7 +38,7 @@ class Patternable p where
   pattern :: p a -> Pattern a
 
 instance Patternable [] where
-  pattern xs = Cycle r 1 (fromIntegral $ length xs)
+  pattern xs = Cycle r (fromIntegral $ length xs)
     where
       r = map (\x -> Atom {onset = (fromIntegral x) /
                                    (fromIntegral $ length xs),
@@ -52,7 +51,7 @@ instance Patternable [] where
 
 size :: Pattern a -> Double
 size (Atom {})  = 1
-size (Cycle {extent = e, reps = r}) = e * r
+size (Cycle {extent = e}) = e
 size (Combo []) = 0
 size (Combo ps) = maximum $ map size ps
 
@@ -81,7 +80,7 @@ every 0 _ p = p
 every n f p = cat $ (take (n-1) $ repeat p) ++ [f p]
 
 cat :: [Pattern a] -> Pattern a
-cat ps = Cycle ps 1 1
+cat ps = Cycle ps 1
 
 --cat :: [Pattern a] -> Pattern a
 --cat ps = Cycle (concatMap events ps') n
@@ -100,7 +99,7 @@ combine = Combo
 --accumFst = scanl1 (\a b -> mapFst (+ (fst a)) b)
 
 sample :: Int -> Signal a -> Pattern a
-sample n s = Cycle ps 1 1
+sample n s = Cycle ps 1
   where ps =
           map (\x ->
                 Atom {
@@ -123,6 +122,9 @@ sinewave1 = ((/ 2) . (+ 1)) . sinewave
 mapFst :: (a -> b) -> (a, c) -> (b, c)
 mapFst f (x,y) = (f x,y)
 
+mapFsts :: (a -> b) -> [(a, c)] -> [(b, c)]
+mapFsts = map . mapFst
+
 mapSnd :: (a -> b) -> (c, a) -> (c, b)
 mapSnd f (x,y) = (x,f y)
 
@@ -132,22 +134,38 @@ modulateOnset f s p = mapOnset (\x -> f (s x) x) p
 wobble :: Double -> Pattern a -> Pattern a
 wobble d p = modulateOnset (+) (fmap (*d) sinewave) p
 
-flatten :: (Double, Double) -> Pattern a -> Maybe (Pattern a)
-flatten (start, end) p@(Atom {onset = o})
-  | and [o > start, o < end] = Just p
-  | otherwise = Nothing
-flatten r p@(Combo ps) = if (null $ patterns p') then Nothing else Just p'
-  where p' = Combo $ catMaybes $ map (flatten r) ps
+flatten :: (Double, Double) -> Pattern a -> [(Double, Event a)]
+flatten (start, end) p@(Atom {onset = o, event = e})
+  | and [o >= start, o < end] = [(o, e)]
+  | otherwise = []
+flatten r p@(Combo ps) = concatMap (flatten r) ps
 
-flatten (start, end) p@(Cycle ps e r)
-  | end < start = Nothing
-  | otherwise = Just p
+{-flatten (start, end) p@(Cycle ps e)
+  | end < start = []
+  | otherwise = flat
   where cycles = map
                  (\offset -> (fromIntegral offset, p))
-                 [floor start .. ceiling end]
-        flat = map
-               (\(o, p) -> (o, flatten (max (start - o) 0, min (end - o) 1) p))
+                 [floor start .. (ceiling end) - 1]
+        flat = concatMap 
+               (\(o, p') -> mapFsts (+ o) $ flatten (max (start - o) 0, min (end - o) 1) p')
                cycles
+-}
+
+flatten' (start, end) p@(Cycle {patterns = ps})
+  | end < start = error "foo"
+  | otherwise = flatEvents
+    where totalSize :: Double
+          totalSize = sum $ map size ps
+          flatPs = map (flatten (0, 1)) ps
+          positions = map (/ totalSize) $ scanl (+) 0 $ map size ps
+          ranges = zip (zip (positions) (tail positions)) flatPs
+          flatEvents = 
+            concatMap (\((a, b), es) -> map (\(o, e) -> (a + (o * (b - a)), e)) es) ranges
+          cycles :: [Double]
+          cycles = map fromIntegral [floor start .. (ceiling end) - 1]
+          flat = concatMap 
+                 (\o -> mapFsts (+ o) $ flatten (max (start - o) 0, min (end - o) 1) p)
+                 cycles
 {-
         totalSize = sum $ map size ps
         positions = map (/ totalSize) $ scanl (+) 0 (map size ps)
