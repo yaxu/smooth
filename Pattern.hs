@@ -5,29 +5,26 @@ import Data.Fixed
 import Data.List
 import Data.Maybe
 
-data Event a = Event {duration :: Maybe Double, value :: Maybe a}
+data Pattern a = Atom {event :: a}
+               | Arc {pattern  :: Pattern a,
+                      onset    :: Double,
+                      duration :: Maybe Double
+                     }
+               | Cycle {patterns :: [Pattern a]}
 
-instance Functor Event where
-  fmap f e = e {value = (fmap (fmap f) value e)}
 
-instance (Show a) => Show (Event a) where
-  show e = show $ value e
 
-data Pattern a = Atom {event :: Event a, onset :: Double}
-               | Cycle {patterns :: [Pattern a],
-                        extent :: Double}
-               | Combo {patterns :: [Pattern a]}
+--data Pattern a = Atom a | Arc (Pattern a) (Double) (Maybe Double) | Cycle 
 
 instance Functor Pattern where
-  fmap f p@(Atom {event = e}) = p {event = fmap f e}
+  fmap f p@(Atom {event = a}) = p {event = f a}
+  fmap f p@(Arc {pattern = p'}) = p {pattern = fmap f p'}
   fmap f p@(Cycle {patterns = ps}) = p {patterns = fmap (fmap f) ps}
-  fmap f (Combo ps) = Combo $ fmap (fmap f) ps
 
 instance (Show a) => Show (Pattern a) where
-  show (Atom e o) = show e ++ "@" ++ show o
-  show (Cycle ps e) =
-    (show e) ++ " x (" ++ (intercalate " " (map show ps)) ++ ")"
-  show (Combo ps) = intercalate ", " (map show ps)
+  show (Atom e) = show e
+  show (Arc p o d) = concat [show p, "@", show o, "x", show d]
+  show (Cycle ps) = "(" ++ (intercalate ", " (map show ps)) ++ ")"
 
 type Signal a = (Double -> a)
 
@@ -35,36 +32,46 @@ type Signal a = (Double -> a)
 --  fmap f s = fmap f s
 
 class Patternable p where
-  pattern :: p a -> Pattern a
+  toPattern :: p a -> Pattern a
 
 instance Patternable [] where
-  pattern xs = Cycle r (fromIntegral $ length xs)
+  toPattern xs = Cycle ps
     where
-      r = map (\x -> Atom {onset = (fromIntegral x) /
+      ps = map (\x -> Arc {pattern = Atom $ xs !! x,
+                           onset = (fromIntegral x) /
                                    (fromIntegral $ length xs),
-                           event = Event {
-                             duration = Nothing,
-                             value = Just $ xs !! x
-                             }
+                           duration = Nothing
                           }
-              ) [0 .. (length xs) - 1]
+               ) [0 .. (length xs) - 1]
 
-size :: Pattern a -> Double
+{-size :: Pattern a -> Double
 size (Atom {})  = 1
 size (Cycle {extent = e}) = e
 size (Combo []) = 0
 size (Combo ps) = maximum $ map size ps
+-}
+
+
+silence :: Pattern a
+silence = Cycle []
 
 mapAtom :: (Pattern a -> Pattern b) -> Pattern a -> Pattern b
-mapAtom f p@(Atom _ _) = f p
+mapAtom f p@(Atom {}) = f p
+mapAtom f p@(Arc {pattern = p'}) = p {pattern = mapAtom f p'}
 mapAtom f p@(Cycle {patterns = ps}) = p {patterns = fmap (mapAtom f) ps}
-mapAtom f p@(Combo {patterns = ps}) = p {patterns = fmap (mapAtom f) ps}
 
+mapArc :: (Pattern a -> Pattern a) -> Pattern a -> Pattern a
+mapArc f p@(Atom {}) = p
+mapArc f p@(Arc {pattern = p'}) = f $ p {pattern = mapArc f p'}
+mapArc f p@(Cycle {patterns = ps}) = p {patterns = fmap (mapArc f) ps}
+
+{-
 mapEvent :: (Event a -> Event b) -> Pattern a -> Pattern b
 mapEvent f p = mapAtom (\p' -> p' {event = f (event p')}) p
+-}
 
 mapOnset :: (Double -> Double) -> Pattern a -> Pattern a
-mapOnset f p = mapAtom (\p' -> p' {onset = f $ onset p'}) p
+mapOnset f p = mapArc (\p' -> p' {onset = f $ onset p'}) p
 
 rev :: Pattern a -> Pattern a
 rev = mapOnset (1 -)
@@ -75,12 +82,22 @@ d <~ p = mapOnset (\x -> mod' (x - d) 1) p
 (~>) :: Double -> Pattern a -> Pattern a
 d ~> p = (0-d) <~ p
 
+
+-- assumes equal duration..
+
+cat :: [Pattern a] -> Pattern a
+cat ps = Cycle $ map a [0 .. (length ps) - 1]
+  where l = length ps
+        d = 1 / (fromIntegral l)
+        a n = Arc {pattern = ps !! n,
+                   onset = d * (fromIntegral n),
+                   duration = Just d
+                  }
+
 every :: Int -> (Pattern a -> Pattern a) -> Pattern a -> Pattern a
 every 0 _ p = p
 every n f p = cat $ (take (n-1) $ repeat p) ++ [f p]
 
-cat :: [Pattern a] -> Pattern a
-cat ps = Cycle ps 1
 
 --cat :: [Pattern a] -> Pattern a
 --cat ps = Cycle (concatMap events ps') n
@@ -90,7 +107,7 @@ cat ps = Cycle ps 1
 --        n = (sum $ (map periodP) ps)
 
 combine :: [Pattern a] -> Pattern a
-combine = Combo
+combine = Cycle
 
 --accumOnsets :: [Event a] -> [Event a]
 --accumOnsets = scanl1 (\a b -> mapOnset (+ (onset a)) b)
@@ -99,19 +116,17 @@ combine = Combo
 --accumFst = scanl1 (\a b -> mapFst (+ (fst a)) b)
 
 sample :: Int -> Signal a -> Pattern a
-sample n s = Cycle ps 1
-  where ps =
-          map (\x ->
-                Atom {
-                  event = (Event {
-                              duration = Nothing,
-                              value = Just (s $ (fromIntegral x) / (fromIntegral n))
-                              }
-                          ),
-                  onset = (fromIntegral x) / (fromIntegral n)
-                  }
-              )
-          [0 .. (n - 1)]
+sample n s = Cycle ps
+  where 
+    d = 1 / (fromIntegral n)
+    ps = map (\x ->
+               Arc {
+                 pattern = Atom (s $ (fromIntegral x) * d),
+                 onset = (fromIntegral x) * d,
+                 duration = Just d
+                 }
+             )
+         [0 .. (n - 1)]
 
 sinewave :: Signal Double
 sinewave = sin . (pi * 2 *)
@@ -128,60 +143,28 @@ mapFsts = map . mapFst
 mapSnd :: (a -> b) -> (c, a) -> (c, b)
 mapSnd f (x,y) = (x,f y)
 
+mapSnds :: (a -> b) -> [(c, a)] -> [(c, b)]
+mapSnds = map . mapSnd
+
 modulateOnset :: (a -> Double -> Double) -> Signal a -> Pattern b -> Pattern b
 modulateOnset f s p = mapOnset (\x -> f (s x) x) p
 
 wobble :: Double -> Pattern a -> Pattern a
 wobble d p = modulateOnset (+) (fmap (*d) sinewave) p
 
-flatten :: (Double, Double) -> Pattern a -> [(Double, Event a)]
-flatten (start, end) p@(Atom {onset = o, event = e})
-  | and [o >= start, o < end] = [(o, e)]
-  | otherwise = []
-flatten r p@(Combo ps) = concatMap (flatten r) ps
+flatten :: Pattern a -> [(Double, a)]
+flatten (Atom e) = [(0, e)]
+flatten Arc {pattern = p, onset = o, duration = d} = 
+  squash o d $ flatten p
+flatten (Cycle ps) = concatMap flatten ps
 
-{-flatten (start, end) p@(Cycle ps e)
-  | end < start = []
-  | otherwise = flat
-  where cycles = map
-                 (\offset -> (fromIntegral offset, p))
-                 [floor start .. (ceiling end) - 1]
-        flat = concatMap 
-               (\(o, p') -> mapFsts (+ o) $ flatten (max (start - o) 0, min (end - o) 1) p')
-               cycles
--}
+squash :: Double -> Maybe Double -> [(Double, a)] -> [(Double, a)]
+squash o d es = mapFsts ((+ o) . (* (fromMaybe 1 d))) es
 
-flatten' (start, end) p@(Cycle {patterns = ps})
-  | end < start = error "foo"
-  | otherwise = flatEvents
-    where totalSize :: Double
-          totalSize = sum $ map size ps
-          flatPs = map (flatten (0, 1)) ps
-          positions = map (/ totalSize) $ scanl (+) 0 $ map size ps
-          ranges = zip (zip (positions) (tail positions)) flatPs
-          flatEvents = 
-            concatMap (\((a, b), es) -> map (\(o, e) -> (a + (o * (b - a)), e)) es) ranges
-          cycles :: [Double]
-          cycles = map fromIntegral [floor start .. (ceiling end) - 1]
-          flat = concatMap 
-                 (\o -> mapFsts (+ o) $ flatten (max (start - o) 0, min (end - o) 1) p)
-                 cycles
 {-
-        totalSize = sum $ map size ps
-        positions = map (/ totalSize) $ scanl (+) 0 (map size ps)
-        ranges = zip (zip (positions) (tail positions)) ps
-        startCycle = mod' start 1
-        duration = end - start
-        deltaCycle = startCycle + duration
-        endCycle = mod' end 1
-        h = filter (\((s, e), p) -> s > startCycle && e < deltaCycle) ranges
-        t | (startCycle + duration) < 1 = filter (\((s, e), p) -> e < endCycle) ranges
-          | otherwise = []
--}
-
 accumFst :: [(Double, a)] -> [(Double, a)]
 accumFst = scanl1 (\a b -> mapFst (+ (fst a)) b)
+modulate :: (a -> b -> c) -> Pattern a -> Signal b -> Pattern c
+modulate f p s = fmap (
+-}
 
-
---modulate :: (a -> b -> c) -> Pattern a -> Signal b -> Pattern c
---modulate f p s = fmap (
