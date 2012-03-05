@@ -24,8 +24,8 @@ instance Ord Param where
 instance Show Param where
   show p = name p
 
-data OscShape = OscShape {path :: String, 
-                          params :: [Param], 
+data OscShape = OscShape {path :: String,
+                          params :: [Param],
                           timestamp :: Bool
                          }
 type OscMap = Map.Map Param (Maybe Datum)
@@ -49,7 +49,7 @@ defaulted :: OscShape -> [Param]
 defaulted = filter hasDefault . params
 
 defaultMap :: OscShape -> OscMap
-defaultMap s 
+defaultMap s
   = Map.fromList $ map (\x -> (x, defaultDatum x)) (defaulted s)
 
 required :: OscShape -> [Param]
@@ -64,7 +64,7 @@ isSubset xs ys = all (\x -> elem x ys) xs
 tpb = 1
 
 toMessage :: OscShape -> BpsChange -> Int -> (Double, OscMap) -> Maybe OSC
-toMessage s change ticks (o, m) = 
+toMessage s change ticks (o, m) =
   do m' <- applyShape' s m
      let beat = fromIntegral ticks / fromIntegral tpb
          latency = 0.02
@@ -102,3 +102,23 @@ onTick s shape patternM change ticks
        putStrLn $ "tick " ++ show ticks ++ " = " ++ show messages
        mapM_ (send s) messages
        return ()
+
+
+make :: (a -> Datum) -> OscShape -> String -> Pattern a -> OscPattern
+make toOsc s nm p = fmap (\x -> Map.singleton nParam (defaultV x)) p
+  where nParam = param s nm
+        defaultV a = Just $ toOsc a
+        --defaultV Nothing = defaultDatum nParam
+
+makeS = make String
+makeF = make Float
+makeI = make Int
+
+param :: OscShape -> String -> Param
+param shape n = head $ filter (\x -> name x == n) (params shape)
+
+merge :: OscPattern -> OscPattern -> OscPattern
+merge x y = Map.union <$> x <*> y
+
+infixr 1 ~~
+(~~) = merge

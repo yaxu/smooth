@@ -13,8 +13,27 @@ data Pattern a = Atom {event :: a}
                | Cycle {patterns :: [Pattern a]}
 
 
+joinPattern :: Pattern (Pattern a) -> Pattern a
+joinPattern = mapAtom (\(Atom x) -> x)
 
---data Pattern a = Atom a | Arc (Pattern a) (Double) (Maybe Double) | Cycle 
+instance Monad Pattern where
+  return = Atom
+  m >>= f = joinPattern (fmap f m)
+
+--  Pattern f newPeriod where
+--  newPeriod = foldl' findPeriod p $ map ps [1..p]
+--  findPeriod p = foldl' lcm p . map period
+--  f n = concatMap (\pat -> at pat n) (ps n)
+
+
+--isIn :: Pattern a -> Pattern b -> Bool
+--isIn (Arc {onset = o1}) (Arc {onset = o2, duration = (Just d2)})
+--  = o1 >= o2 && o1 < (o2 + d2)
+--isIn (Arc {onset = o1}) (Arc {onset = o2, duration = Nothing})
+--  = o1 == o2
+--isIn _ _ = False -- only makes sense for Arcs
+
+--data Pattern a = Atom a | Arc (Pattern a) (Double) (Maybe Double) | Cycle
 
 instance Functor Pattern where
   fmap f p@(Atom {event = a}) = p {event = f a}
@@ -22,9 +41,9 @@ instance Functor Pattern where
   fmap f p@(Cycle {patterns = ps}) = p {patterns = fmap (fmap f) ps}
 
 instance (Show a) => Show (Pattern a) where
-  show (Atom e) = show e
-  show (Arc p o d) = concat [show p, "@", show o, "x", show d]
-  show (Cycle ps) = "(" ++ (intercalate ", " (map show ps)) ++ ")"
+  show (Atom e) = concat ["(Atom ", show e, ")\n"]
+  show (Arc p o d) = concat ["(Arc ", show p, "@", show o, "x", show d, ")\n"]
+  show (Cycle ps) = "(cycle " ++ (intercalate ", " (map show ps)) ++ ")\n"
 
 type Signal a = (Double -> a)
 
@@ -117,7 +136,7 @@ combine = Cycle
 
 sample :: Int -> Signal a -> Pattern a
 sample n s = Cycle ps
-  where 
+  where
     d = 1 / (fromIntegral n)
     ps = map (\x ->
                Arc {
@@ -154,7 +173,7 @@ wobble d p = modulateOnset (+) (fmap (*d) sinewave) p
 
 flatten :: Pattern a -> [(Double, a)]
 flatten (Atom e) = [(0, e)]
-flatten Arc {pattern = p, onset = o, duration = d} = 
+flatten Arc {pattern = p, onset = o, duration = d} =
   squash o d $ flatten p
 flatten (Cycle ps) = concatMap flatten ps
 
