@@ -25,8 +25,8 @@ instance Monad Pattern where
 instance Applicative Pattern where
   pure = Atom
 
-  Atom f <*> xs = mapAtom (fmap f) xs
-  fs <*> (Atom x) = mapAtom (\(Atom f) -> Atom $ f x) fs
+  Atom f <*> xs = f <$> xs
+  fs <*> (Atom x) = (\f -> f x) <$> fs
 
   (Cycle fs) <*> xs = Cycle $ map (<*> xs) fs
   fs <*> (Cycle xs) = Cycle $ map (fs <*>) xs
