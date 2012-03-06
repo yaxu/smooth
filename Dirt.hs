@@ -2,6 +2,7 @@ module Dirt where
 
 import Stream
 import Pattern
+import Parse
 import Sound.OpenSoundControl
 import qualified Data.Map as Map
 import Control.Concurrent.MVar
@@ -26,3 +27,11 @@ x' pan = Map.insert (params dirt !! 4) (Just $ Float pan) $ x
 c = Cycle $ map (\i -> (Arc (Atom $ x' (channels * (fromIntegral i / fromIntegral steps))) (fromIntegral i / fromIntegral steps) Nothing)) [0 .. (steps - 1)]
 
 startdirt = start "127.0.0.1" "127.0.0.1" "deardirt" "127.0.0.1" 7771 dirt
+
+sample       = makeS dirt "sample"
+offset       = makeF dirt "offset"
+duration     = makeF dirt "duration"
+speed        = makeF dirt "speed"
+pan          = makeF dirt "pan"
+velocity     = makeF dirt "velocity"
+
