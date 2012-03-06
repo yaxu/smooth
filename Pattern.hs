@@ -11,7 +11,9 @@ data Pattern a = Atom {event :: a}
                       duration :: Maybe Double
                      }
                | Cycle {patterns :: [Pattern a]}
+               | Signal {at :: Double -> Pattern a}
 
+-- make Silence constructor to use instead of Cycle [] ?
 
 joinPattern :: Pattern (Pattern a) -> Pattern a
 joinPattern = mapAtom (\(Atom x) -> x)
@@ -20,18 +22,30 @@ instance Monad Pattern where
   return = Atom
   m >>= f = joinPattern (fmap f m)
 
---  Pattern f newPeriod where
---  newPeriod = foldl' findPeriod p $ map ps [1..p]
---  findPeriod p = foldl' lcm p . map period
---  f n = concatMap (\pat -> at pat n) (ps n)
+instance Applicative Pattern where
+  pure = Atom
 
+  Atom f <*> xs = mapAtom (fmap f) xs
+  fs <*> (Atom x) = mapAtom (\(Atom f) -> Atom $ f x) fs
 
---isIn :: Pattern a -> Pattern b -> Bool
---isIn (Arc {onset = o1}) (Arc {onset = o2, duration = (Just d2)})
---  = o1 >= o2 && o1 < (o2 + d2)
---isIn (Arc {onset = o1}) (Arc {onset = o2, duration = Nothing})
---  = o1 == o2
---isIn _ _ = False -- only makes sense for Arcs
+  (Cycle fs) <*> xs = Cycle $ map (<*> xs) fs
+  fs <*> (Cycle xs) = Cycle $ map (fs <*>) xs
+
+  fs@(Arc {onset = o}) <*> s@(Signal {}) = fs <*> (at s o)
+  fs@(Arc {}) <*> xs@(Arc {}) | isIn fs xs = fs {pattern = (pattern fs) <*> (pattern xs)}
+                              | otherwise = Cycle []
+
+  fs@(Signal {}) <*> xs = Signal $ (<*> xs) . (at fs)
+  fs <*> xs@(Signal {}) = Signal $ (fs <*>) . (at xs)
+
+    --where s n = mapAtom (\x -> mapAtom (\f -> Atom $ (event f) (event x)) (at fs n)) xs
+
+isIn :: Pattern a -> Pattern b -> Bool
+isIn (Arc {onset = o1}) (Arc {onset = o2, duration = (Just d2)})
+  = o1 >= o2 && o1 < (o2 + d2)
+isIn (Arc {onset = o1}) (Arc {onset = o2, duration = Nothing})
+  = o1 == o2
+isIn _ _ = False -- only makes sense for Arcs
 
 --data Pattern a = Atom a | Arc (Pattern a) (Double) (Maybe Double) | Cycle
 
@@ -39,16 +53,13 @@ instance Functor Pattern where
   fmap f p@(Atom {event = a}) = p {event = f a}
   fmap f p@(Arc {pattern = p'}) = p {pattern = fmap f p'}
   fmap f p@(Cycle {patterns = ps}) = p {patterns = fmap (fmap f) ps}
+  fmap f p@(Signal _) = p {at = (fmap f) . (at p)}
 
 instance (Show a) => Show (Pattern a) where
   show (Atom e) = concat ["(Atom ", show e, ")\n"]
   show (Arc p o d) = concat ["(Arc ", show p, "@", show o, "x", show d, ")\n"]
   show (Cycle ps) = "(cycle " ++ (intercalate ", " (map show ps)) ++ ")\n"
-
-type Signal a = (Double -> a)
-
---instance Functor Signal where
---  fmap f s = fmap f s
+  show (Signal s) = "*signal*"
 
 class Patternable p where
   toPattern :: p a -> Pattern a
@@ -78,11 +89,24 @@ mapAtom :: (Pattern a -> Pattern b) -> Pattern a -> Pattern b
 mapAtom f p@(Atom {}) = f p
 mapAtom f p@(Arc {pattern = p'}) = p {pattern = mapAtom f p'}
 mapAtom f p@(Cycle {patterns = ps}) = p {patterns = fmap (mapAtom f) ps}
+mapAtom f p@(Signal _) = p {at = fmap (mapAtom f) (at p)}
+
+filterP :: (Pattern a -> Bool) -> Pattern a -> Pattern a
+filterP f p@(Atom {}) | f p = p
+                      | otherwise = Cycle []
+filterP f p@(Cycle ps) | f p = p {patterns = map (filterP f) ps}
+                       | otherwise = Cycle []
+filterP f p@(Arc {}) | f p = p {pattern = filterP f (pattern p)}
+                     | otherwise = Cycle []
+filterP f p@(Signal {}) | f p = p {at = (filterP f) . (at p)}
+
 
 mapArc :: (Pattern a -> Pattern a) -> Pattern a -> Pattern a
 mapArc f p@(Atom {}) = p
 mapArc f p@(Arc {pattern = p'}) = f $ p {pattern = mapArc f p'}
 mapArc f p@(Cycle {patterns = ps}) = p {patterns = fmap (mapArc f) ps}
+mapArc f p@(Signal _) = p {at = fmap (mapArc f) (at p)}
+
 
 {-
 mapEvent :: (Event a -> Event b) -> Pattern a -> Pattern b
@@ -134,6 +158,17 @@ combine = Cycle
 --accumFst :: [(Double, a)] -> [(Double, a)]
 --accumFst = scanl1 (\a b -> mapFst (+ (fst a)) b)
 
+sinewave :: Pattern Double
+sinewave = Signal {at = f}
+  where f x = Arc {pattern = Atom $ (sin . (pi * 2 *)) x,
+                   onset = mod' x 1,
+                   duration = Nothing
+                   }
+
+sinewave1 :: Pattern Double
+sinewave1 = fmap ((/ 2) . (+ 1))  sinewave
+
+{-
 sample :: Int -> Signal a -> Pattern a
 sample n s = Cycle ps
   where
@@ -147,12 +182,12 @@ sample n s = Cycle ps
              )
          [0 .. (n - 1)]
 
-sinewave :: Signal Double
-sinewave = sin . (pi * 2 *)
+modulateOnset :: (a -> Double -> Double) -> Signal a -> Pattern b -> Pattern b
+modulateOnset f s p = mapOnset (\x -> f (s x) x) p
 
-sinewave1 :: Signal Double
-sinewave1 = ((/ 2) . (+ 1)) . sinewave
-
+wobble :: Double -> Pattern a -> Pattern a
+wobble d p = modulateOnset (+) (fmap (*d) sinewave) p
+-}
 mapFst :: (a -> b) -> (a, c) -> (b, c)
 mapFst f (x,y) = (f x,y)
 
@@ -165,11 +200,7 @@ mapSnd f (x,y) = (x,f y)
 mapSnds :: (a -> b) -> [(c, a)] -> [(c, b)]
 mapSnds = map . mapSnd
 
-modulateOnset :: (a -> Double -> Double) -> Signal a -> Pattern b -> Pattern b
-modulateOnset f s p = mapOnset (\x -> f (s x) x) p
 
-wobble :: Double -> Pattern a -> Pattern a
-wobble d p = modulateOnset (+) (fmap (*d) sinewave) p
 
 flatten :: Pattern a -> [(Double, a)]
 flatten (Atom e) = [(0, e)]
