@@ -1,3 +1,5 @@
 d <- dirtstream "dirt0"
 
-d $ sample "chin/0 ~ ~ ~"
+d $ sample (every 1 (0.1 <~) "[drum/0 ~ sn/1 ~ ~, ~ sn/1 sn/2 ~ sn/4 sn/3]")
+  ~~ pan "1"
+d silence
