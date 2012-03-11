@@ -1,5 +1,23 @@
-d <- dirtstream "dirt0"
+d <- dirtstream "dirt1"
+d2 <- dirtstream "dirt2"
 
-d $ sample (every 1 (0.1 <~) "<4> [drum/0 ~ sn/1 ~ ~, ~ sn/1 sn/2 ~ sn/4 sn/3]")
+d $ sample ("[wobble wobble hc bd future hc, chin hc chin, ~ sn hc sn hc]")
+  ~~ speed "[4.0 2.0 3.0 2.0]"
   ~~ pan "1"
+
+d2 $ sample ("[wobble ~ wobble hc ~ bd future hc, chin hc ~ chin, ~ sn hc ~ sn hc]")
+  ~~ speed "[2.0 1.0 4.0 2.0]"
+  ~~ pan "0"
+
+
+d silence
+
+reps x
+
+d silence
+
+d2 $ sample ("[bd/1  ~, future/0 ~ ~, ~ sn/1 ~ ~]")
+  ~~ pan "1"
+
+
 d silence

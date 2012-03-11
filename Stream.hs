@@ -9,6 +9,8 @@ import Network.Netclock.Client
 import Control.Concurrent
 import Control.Concurrent.MVar
 import Pattern
+import Data.Ratio
+
 import qualified Data.Map as Map
 
 
@@ -103,7 +105,11 @@ stream client server name address port shape
 onTick :: UDP -> OscShape -> MVar (OscPattern) -> BpsChange -> Int -> IO ()
 onTick s shape patternM change ticks
   = do p <- readMVar patternM
-       let messages = mapMaybe (toMessage shape change ticks) (flatten p)
+       let tpb' = fromIntegral tpb
+           ticks' = fromIntegral ticks
+           messages = mapMaybe 
+                      (toMessage shape change ticks) 
+                      (flat' (0,1) p)
        putStrLn $ "tick " ++ show ticks ++ " = " ++ show messages
        mapM_ (send s) messages
        return ()

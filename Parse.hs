@@ -6,14 +6,9 @@ import Text.ParserCombinators.Parsec
 import qualified Text.ParserCombinators.Parsec.Token as P
 import Text.ParserCombinators.Parsec.Language ( haskellDef )
 import Pattern
+import Data.Ratio
 
 import GHC.Exts( IsString(..) )
--- import Data.List
--- import Data.Maybe
--- --import Text.Regex
--- import Data.Colour
--- import Data.Colour.Names
--- import Data.Colour.SRGB
 
 class Parseable a where
   p :: String -> Pattern a
@@ -88,8 +83,10 @@ pRhythm f = do spaces
                pSequence f
 
 pSequence :: Parser (Pattern a) -> GenParser Char () (Pattern a)
-pSequence f = do ps <- many $ pPart f
-                 return $ cat ps
+pSequence f = do x <-pReps
+                 ps <- many $ pPart f
+                 let p = Arc (cat ps) 0 1 x
+                 return $ p
 
 pPart :: Parser (Pattern a) -> Parser (Pattern a)
 pPart f = do part <- parens (pSequence f) <|> f <|> pPoly f
@@ -123,10 +120,16 @@ pInt :: Parser (Pattern Int)
 pInt = do i <- natural <?> "integer"
           return $ Atom (fromIntegral i)
 
-pRepetition :: Parser (Double)
-pRepetition = do nf <- angles (intOrFloat <?> "float")
-                 let f = either fromIntegral id nf
-                 return $ f
-              <|>
-              do return 0
+pRatio :: Parser (Rational)
+pRatio = do n <- natural <?> "numerator"
+            d <- do char '/'
+                    natural <?> "denominator"
+                 <|>
+                 do return 1
+            return $ n % d
+
+pReps :: Parser (Rational)
+pReps = angles (pRatio <?> "ratio")
+        <|>
+        do return (1 % 1)
 

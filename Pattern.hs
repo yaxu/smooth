@@ -4,6 +4,7 @@ import Control.Applicative
 import Data.Fixed
 import Data.List
 import Data.Maybe
+import Data.Ratio
 
 data Pattern a = Atom {event :: a}
              | Cycle {patterns :: [Pattern a]}
@@ -47,9 +48,7 @@ isIn :: Pattern a -> Pattern b -> Bool
 isIn (Arc {onset = o1}) (Arc {onset = o2, reps = r2})
   = (o1 >= o2 && o1 < (o2 + r2)) 
     -- || (r2 == 0 && o1 == o2)
-isIn _ _ = False -- only makes sense for Arcs
-
---data Pattern a = Atom a | Arc (Pattern a) (Double) (Maybe Double) | Cycle
+isIn _ _ = False
 
 instance Functor Pattern where
   fmap f p@(Atom {event = a}) = p {event = f a}
@@ -72,9 +71,9 @@ instance Patternable [] where
   toPattern xs = Cycle ps
     where
       ps = map (\x -> Arc {pattern = Atom $ xs !! x,
-                           onset = (fromIntegral x) /
+                           onset = (fromIntegral x) %
                                    (fromIntegral l),
-                           scale = 1 / (fromIntegral l),
+                           scale = 1 % (fromIntegral l),
                            reps = 1
                           }
                ) [0 .. l - 1]
@@ -139,7 +138,7 @@ d ~> p = (0-d) <~ p
 cat :: [Pattern a] -> Pattern a
 cat ps = Cycle $ map a [0 .. (length ps) - 1]
   where l = length ps
-        s = 1 / (fromIntegral l)
+        s = 1 % (fromIntegral l)
         a n = Arc {pattern = ps !! n,
                    onset = s * (fromIntegral n),
                    scale = s,
@@ -210,7 +209,8 @@ mapSnd f (x,y) = (x,f y)
 mapSnds :: (a -> b) -> [(c, a)] -> [(c, b)]
 mapSnds = map . mapSnd
 
-
+flatten' :: Pattern a -> [(Double, a)]
+flatten' p = mapFsts (fromRational) (flatten p)
 
 flatten :: Pattern a -> [(Rational, a)]
 flatten (Atom e) = [(0, e)]
@@ -227,19 +227,16 @@ flat (a, b) Arc {pattern = p, onset = o, scale = s, reps = r}
   where s' = b - a
         a' = (o - a) / s'
         b' = a' + (s / s')
-        isWithin = a' >= 0 && b' < 1
+        isWithin = (a' >= 0 && a' < 1) || (b' >= 0 && b' < 1)
 
 flat (a, b) (Cycle ps) = concatMap (flat (a, b)) ps
 flat _ Silence = []
 
+flat' :: (Rational, Rational) -> Pattern a -> [(Double, a)]
+flat' r p = mapFsts (fromRational) (flat r p)
+
+
 squash :: Rational -> Rational -> [(Rational, a)] -> [(Rational, a)]
 squash o s es = mapFsts ((+ o) . (* s)) es
 
-
-{-
-accumFst :: [(Double, a)] -> [(Double, a)]
-accumFst = scanl1 (\a b -> mapFst (+ (fst a)) b)
-modulate :: (a -> b -> c) -> Pattern a -> Signal b -> Pattern c
-modulate f p s = fmap (
--}
 
