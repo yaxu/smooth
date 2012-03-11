@@ -42,6 +42,7 @@ lexer   = P.makeTokenParser haskellDef
 braces  = P.braces lexer
 brackets = P.brackets lexer
 parens = P.parens lexer
+angles = P.angles lexer
 symbol  = P.symbol lexer
 natural = P.natural lexer
 float = P.float lexer
@@ -74,10 +75,6 @@ r s orig = do catch (return $ p s)
                 (\err -> do putStrLn (show err)
                             return orig
                 )
-
---playRhythm :: (Monad m, Show a) => Parser (Pattern a) -> String -> m [Char]
---playRhythm f s = do let parsed = parseRhythm f s
---                    return $ either (\e -> "Error" ++ show e)  show parsed
 
 parseRhythm :: Parser (Pattern a) -> String -> (Pattern a)
 parseRhythm f input = either (const silence) id $ parse (pRhythm f') "" input
@@ -122,16 +119,14 @@ pBool = do oneOf "t1"
         do oneOf "f0"
            return $ Atom False
 
--- pColour :: Parser (Pattern ColourD)
--- pColour = do name <- many1 letter <?> "colour name"
---              colour <- readColourName name <?> "known colour"
---              return $ Atom colour
-
 pInt :: Parser (Pattern Int)
 pInt = do i <- natural <?> "integer"
           return $ Atom (fromIntegral i)
 
--- doubleToGray :: Double -> ColourD
--- doubleToGray n = let shade = n in
---                      sRGB shade shade shade
+pRepetition :: Parser (Double)
+pRepetition = do nf <- angles (intOrFloat <?> "float")
+                 let f = either fromIntegral id nf
+                 return $ f
+              <|>
+              do return 0
 

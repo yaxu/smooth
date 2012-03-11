@@ -94,6 +94,11 @@ start client server name address port shape
        forkIO $ clocked name client server 1 ot
        return patternM
 
+stream :: String -> String -> String -> String -> Int -> OscShape -> IO (OscPattern -> IO ())
+stream client server name address port shape 
+  = do patternM <- start client server name address port shape
+       return $ \p -> do swapMVar patternM p
+                         return ()
 
 onTick :: UDP -> OscShape -> MVar (OscPattern) -> BpsChange -> Int -> IO ()
 onTick s shape patternM change ticks
