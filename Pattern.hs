@@ -4,23 +4,20 @@ import Control.Applicative
 import Data.Fixed
 import Data.List
 import Data.Maybe
+import Data.Ratio
 
 data Pattern a = Atom {event :: a}
-               | Arc {pattern  :: Pattern a,
-                      onset    :: Double,
-                      duration :: Maybe Double
-                     }
-               | Cycle {patterns :: [Pattern a]}
-               | Signal {at :: Double -> Pattern a}
-
--- make Silence constructor to use instead of Cycle [] ?
+             | Cycle {patterns :: [Pattern a]}
+             | Signal {at :: Rational -> Pattern a}
+             | Silence
+             | Arc {pattern :: Pattern a,
+                    onset :: Rational,
+                    scale :: Rational,
+                    reps :: Rational
+                   }
 
 joinPattern :: Pattern (Pattern a) -> Pattern a
 joinPattern = mapAtom (\(Atom x) -> x)
-
-instance Monad Pattern where
-  return = Atom
-  m >>= f = joinPattern (fmap f m)
 
 instance Applicative Pattern where
   pure = Atom
@@ -31,35 +28,55 @@ instance Applicative Pattern where
   (Cycle fs) <*> xs = Cycle $ map (<*> xs) fs
   fs <*> (Cycle xs) = Cycle $ map (fs <*>) xs
 
-  fs@(Arc {onset = o}) <*> s@(Signal {}) = fs <*> (at s o)
   fs@(Arc {}) <*> xs@(Arc {}) | isIn fs xs = fs {pattern = (pattern fs) <*> (pattern xs)}
-                              | otherwise = Cycle []
+                              | otherwise = Silence
+
+--  fs@(Arc {onset = o}) <*> s@(Signal {}) = fs <*> (at s o)
+  fs@(Arc {onset = o}) <*> s@(Signal {}) = applySignal (0, 1) fs (at s)
 
   fs@(Signal {}) <*> xs = Signal $ (<*> xs) . (at fs)
   fs <*> xs@(Signal {}) = Signal $ (fs <*>) . (at xs)
+  _ <*> Silence = Silence
+  Silence <*> _ = Silence
+
+applySignal :: (Rational, Rational) -> Pattern (a -> b) -> (Rational -> Pattern a) -> Pattern b
+
+applySignal (o, s) p@(Cycle fs) sig
+  = Cycle $ map (\f -> applySignal (o, s) f sig) fs
+
+applySignal (o, s) p@(Arc {pattern = p', onset = o', scale = s'}) sig
+  = p {pattern = applySignal (o'', s'') p' sig}
+  where o'' = o + (o' * s)
+        s'' = o + ((o' + s') * s)
+
+applySignal (o, s) fs sig
+  = fs <*> (sig o)
+
+instance Monad Pattern where
+  return = pure
+  m >>= f = joinPattern (fmap f m)
 
     --where s n = mapAtom (\x -> mapAtom (\f -> Atom $ (event f) (event x)) (at fs n)) xs
 
 isIn :: Pattern a -> Pattern b -> Bool
-isIn (Arc {onset = o1}) (Arc {onset = o2, duration = (Just d2)})
-  = o1 >= o2 && o1 < (o2 + d2)
-isIn (Arc {onset = o1}) (Arc {onset = o2, duration = Nothing})
-  = o1 == o2
-isIn _ _ = False -- only makes sense for Arcs
-
---data Pattern a = Atom a | Arc (Pattern a) (Double) (Maybe Double) | Cycle
+isIn (Arc {onset = o1}) (Arc {onset = o2, reps = r2})
+  = (o1 >= o2 && o1 < (o2 + r2)) 
+    -- || (r2 == 0 && o1 == o2)
+isIn _ _ = False
 
 instance Functor Pattern where
   fmap f p@(Atom {event = a}) = p {event = f a}
   fmap f p@(Arc {pattern = p'}) = p {pattern = fmap f p'}
   fmap f p@(Cycle {patterns = ps}) = p {patterns = fmap (fmap f) ps}
   fmap f p@(Signal _) = p {at = (fmap f) . (at p)}
+  fmap _ Silence = Silence
 
 instance (Show a) => Show (Pattern a) where
-  show (Atom e) = concat ["(Atom ", show e, ")\n"]
-  show (Arc p o d) = concat ["(Arc ", show p, "@", show o, "x", show d, ")\n"]
-  show (Cycle ps) = "(cycle " ++ (intercalate ", " (map show ps)) ++ ")\n"
+  show (Atom e) = show e
+  show (Arc p o d r) = concat ["[", show p, "@(", show o, ")x(", show d, ")]"]
+  show (Cycle ps) = "(" ++ (intercalate ", " (map show ps)) ++ ")"
   show (Signal s) = "*signal*"
+  show Silence = "~"
 
 class Patternable p where
   toPattern :: p a -> Pattern a
@@ -67,9 +84,20 @@ class Patternable p where
 instance Patternable [] where
   toPattern xs = Cycle ps
     where
+<<<<<<< HEAD
       n = length xs
       ps = zipWith mkArc xs [0..]
       mkArc x i = Arc (Atom x) ((fromIntegral i) / (fromIntegral n)) Nothing
+=======
+      ps = map (\x -> Arc {pattern = Atom $ xs !! x,
+                           onset = (fromIntegral x) %
+                                   (fromIntegral l),
+                           scale = 1 % (fromIntegral l),
+                           reps = 1
+                          }
+               ) [0 .. l - 1]
+      l = length xs
+>>>>>>> b19758be4822b9ce98811259887619554c8717c9
 
 {-size :: Pattern a -> Double
 size (Atom {})  = 1
@@ -80,29 +108,31 @@ size (Combo ps) = maximum $ map size ps
 
 
 silence :: Pattern a
-silence = Cycle []
+silence = Silence
 
 mapAtom :: (Pattern a -> Pattern b) -> Pattern a -> Pattern b
 mapAtom f p@(Atom {}) = f p
 mapAtom f p@(Arc {pattern = p'}) = p {pattern = mapAtom f p'}
 mapAtom f p@(Cycle {patterns = ps}) = p {patterns = fmap (mapAtom f) ps}
 mapAtom f p@(Signal _) = p {at = fmap (mapAtom f) (at p)}
+mapAtom _ Silence = Silence
 
 filterP :: (Pattern a -> Bool) -> Pattern a -> Pattern a
 filterP f p@(Atom {}) | f p = p
-                      | otherwise = Cycle []
+                      | otherwise = Silence
 filterP f p@(Cycle ps) | f p = p {patterns = map (filterP f) ps}
-                       | otherwise = Cycle []
+                       | otherwise = Silence
 filterP f p@(Arc {}) | f p = p {pattern = filterP f (pattern p)}
-                     | otherwise = Cycle []
+                     | otherwise = Silence
 filterP f p@(Signal {}) | f p = p {at = (filterP f) . (at p)}
-
+filterP _ Silence = Silence
 
 mapArc :: (Pattern a -> Pattern a) -> Pattern a -> Pattern a
 mapArc f p@(Atom {}) = p
 mapArc f p@(Arc {pattern = p'}) = f $ p {pattern = mapArc f p'}
 mapArc f p@(Cycle {patterns = ps}) = p {patterns = fmap (mapArc f) ps}
 mapArc f p@(Signal _) = p {at = fmap (mapArc f) (at p)}
+mapArc _ Silence = Silence
 
 
 {-
@@ -110,28 +140,29 @@ mapEvent :: (Event a -> Event b) -> Pattern a -> Pattern b
 mapEvent f p = mapAtom (\p' -> p' {event = f (event p')}) p
 -}
 
-mapOnset :: (Double -> Double) -> Pattern a -> Pattern a
+mapOnset :: (Rational -> Rational) -> Pattern a -> Pattern a
 mapOnset f p = mapArc (\p' -> p' {onset = f $ onset p'}) p
 
 rev :: Pattern a -> Pattern a
 rev = mapOnset (1 -)
 
-(<~) :: Double -> Pattern a -> Pattern a
+(<~) :: Rational -> Pattern a -> Pattern a
 d <~ p = mapOnset (\x -> mod' (x - d) 1) p
 
-(~>) :: Double -> Pattern a -> Pattern a
+(~>) :: Rational -> Pattern a -> Pattern a
 d ~> p = (0-d) <~ p
 
 
--- assumes equal duration..
+-- assumes equal scale..
 
 cat :: [Pattern a] -> Pattern a
 cat ps = Cycle $ map a [0 .. (length ps) - 1]
   where l = length ps
-        d = 1 / (fromIntegral l)
+        s = 1 % (fromIntegral l)
         a n = Arc {pattern = ps !! n,
-                   onset = d * (fromIntegral n),
-                   duration = Just d
+                   onset = s * (fromIntegral n),
+                   scale = s,
+                   reps = 1
                   }
 
 every :: Int -> (Pattern a -> Pattern a) -> Pattern a -> Pattern a
@@ -157,28 +188,26 @@ combine = Cycle
 
 sinewave :: Pattern Double
 sinewave = Signal {at = f}
-  where f x = Arc {pattern = Atom $ (sin . (pi * 2 *)) x,
-                   onset = mod' x 1,
-                   duration = Nothing
-                   }
+  where f x = Atom $ (sin . (pi * 2 *)) (fromRational x)
 
 sinewave1 :: Pattern Double
 sinewave1 = fmap ((/ 2) . (+ 1))  sinewave
 
-{-
-sample :: Int -> Signal a -> Pattern a
+sample :: Int -> Pattern a -> Pattern a
 sample n s = Cycle ps
   where
-    d = 1 / (fromIntegral n)
+    d = 1 % (fromIntegral n)
     ps = map (\x ->
                Arc {
-                 pattern = Atom (s $ (fromIntegral x) * d),
+                 pattern = (at s $ (fromIntegral x) * d),
                  onset = (fromIntegral x) * d,
-                 duration = Just d
+                 scale = d,
+                 reps = 1
                  }
              )
          [0 .. (n - 1)]
 
+{-
 modulateOnset :: (a -> Double -> Double) -> Signal a -> Pattern b -> Pattern b
 modulateOnset f s p = mapOnset (\x -> f (s x) x) p
 
@@ -197,21 +226,39 @@ mapSnd f (x,y) = (x,f y)
 mapSnds :: (a -> b) -> [(c, a)] -> [(c, b)]
 mapSnds = map . mapSnd
 
+flatten' :: Pattern a -> [(Double, a)]
+flatten' p = mapFsts (fromRational) (flatten p)
 
-
-flatten :: Pattern a -> [(Double, a)]
+flatten :: Pattern a -> [(Rational, a)]
 flatten (Atom e) = [(0, e)]
-flatten Arc {pattern = p, onset = o, duration = d} =
-  squash o d $ flatten p
+flatten Arc {pattern = p, onset = o, scale = s, reps = r} =
+  squash o s $ flatten p
 flatten (Cycle ps) = concatMap flatten ps
+flatten Silence = []
 
-squash :: Double -> Maybe Double -> [(Double, a)] -> [(Double, a)]
-squash o d es = mapFsts ((+ o) . (* (fromMaybe 1 d))) es
+flat :: (Rational, Rational) -> Pattern a -> [(Rational, a)]
+flat (o, d) (Silence) = []
+flat (o, d) (Atom e) = [(0, e)]
+flat (a, b) (Cycle ps) = concatMap (flat (a, b)) ps
+flat (a, b) Arc {pattern = p, onset = o, scale = s, reps = r} 
+  | isWithin a b a' b' = squash o s $ flat (0 - ((a'-a)/s'), 1 + ((b-b')/s')) p
+--  | isWithin a b a' b' = squash o s $ flat (0 - ((a'-a)/s'), 1 + ((b-b')/s)) p
+  | otherwise = []
+  where s' = b - a
+        a' = o
+        b' = o + s
 
-{-
-accumFst :: [(Double, a)] -> [(Double, a)]
-accumFst = scanl1 (\a b -> mapFst (+ (fst a)) b)
-modulate :: (a -> b -> c) -> Pattern a -> Signal b -> Pattern c
-modulate f p s = fmap (
--}
+isWithin a b a' b' = or [a' >= a && a' < b,
+                         b' > a && b' <= b,
+                         a' <= a && b' >= b
+                        ]
+
+
+flat' :: (Rational, Rational) -> Pattern a -> [(Double, a)]
+flat' r p = mapFsts (fromRational) (flat r p)
+
+
+squash :: Rational -> Rational -> [(Rational, a)] -> [(Rational, a)]
+squash o s es = mapFsts ((+ o) . (* s)) es
+
 

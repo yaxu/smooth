@@ -6,14 +6,9 @@ import Text.ParserCombinators.Parsec
 import qualified Text.ParserCombinators.Parsec.Token as P
 import Text.ParserCombinators.Parsec.Language ( haskellDef )
 import Pattern
+import Data.Ratio
 
 import GHC.Exts( IsString(..) )
--- import Data.List
--- import Data.Maybe
--- --import Text.Regex
--- import Data.Colour
--- import Data.Colour.Names
--- import Data.Colour.SRGB
 
 class Parseable a where
   p :: String -> Pattern a
@@ -42,6 +37,7 @@ lexer   = P.makeTokenParser haskellDef
 braces  = P.braces lexer
 brackets = P.brackets lexer
 parens = P.parens lexer
+angles = P.angles lexer
 symbol  = P.symbol lexer
 natural = P.natural lexer
 float = P.float lexer
@@ -75,10 +71,6 @@ r s orig = do catch (return $ p s)
                             return orig
                 )
 
---playRhythm :: (Monad m, Show a) => Parser (Pattern a) -> String -> m [Char]
---playRhythm f s = do let parsed = parseRhythm f s
---                    return $ either (\e -> "Error" ++ show e)  show parsed
-
 parseRhythm :: Parser (Pattern a) -> String -> (Pattern a)
 parseRhythm f input = either (const silence) id $ parse (pRhythm f') "" input
   where f' = f
@@ -91,8 +83,10 @@ pRhythm f = do spaces
                pSequence f
 
 pSequence :: Parser (Pattern a) -> GenParser Char () (Pattern a)
-pSequence f = do ps <- many $ pPart f
-                 return $ cat ps
+pSequence f = do x <-pReps
+                 ps <- many $ pPart f
+                 let p = Arc (cat ps) 0 1 x
+                 return $ p
 
 pPart :: Parser (Pattern a) -> Parser (Pattern a)
 pPart f = do part <- parens (pSequence f) <|> f <|> pPoly f
@@ -122,16 +116,20 @@ pBool = do oneOf "t1"
         do oneOf "f0"
            return $ Atom False
 
--- pColour :: Parser (Pattern ColourD)
--- pColour = do name <- many1 letter <?> "colour name"
---              colour <- readColourName name <?> "known colour"
---              return $ Atom colour
-
 pInt :: Parser (Pattern Int)
 pInt = do i <- natural <?> "integer"
           return $ Atom (fromIntegral i)
 
--- doubleToGray :: Double -> ColourD
--- doubleToGray n = let shade = n in
---                      sRGB shade shade shade
+pRatio :: Parser (Rational)
+pRatio = do n <- natural <?> "numerator"
+            d <- do char '/'
+                    natural <?> "denominator"
+                 <|>
+                 do return 1
+            return $ n % d
+
+pReps :: Parser (Rational)
+pReps = angles (pRatio <?> "ratio")
+        <|>
+        do return (1 % 1)
 

@@ -9,6 +9,8 @@ import Network.Netclock.Client
 import Control.Concurrent
 import Control.Concurrent.MVar
 import Pattern
+import Data.Ratio
+
 import qualified Data.Map as Map
 
 
@@ -67,7 +69,7 @@ toMessage :: OscShape -> BpsChange -> Int -> (Double, OscMap) -> Maybe OSC
 toMessage s change ticks (o, m) =
   do m' <- applyShape' s m
      let beat = fromIntegral ticks / fromIntegral tpb
-         latency = 0.02
+         latency = 0.04
          logicalNow = (logicalTime change beat)
          beat' = (fromIntegral ticks + 1) / fromIntegral tpb
          logicalPeriod = (logicalTime change (beat + 1)) - logicalNow
@@ -94,12 +96,21 @@ start client server name address port shape
        forkIO $ clocked name client server 1 ot
        return patternM
 
+stream :: String -> String -> String -> String -> Int -> OscShape -> IO (OscPattern -> IO ())
+stream client server name address port shape 
+  = do patternM <- start client server name address port shape
+       return $ \p -> do swapMVar patternM p
+                         return ()
 
 onTick :: UDP -> OscShape -> MVar (OscPattern) -> BpsChange -> Int -> IO ()
 onTick s shape patternM change ticks
   = do p <- readMVar patternM
-       let messages = mapMaybe (toMessage shape change ticks) (flatten p)
-       putStrLn $ "tick " ++ show ticks ++ " = " ++ show messages
+       let tpb' = fromIntegral tpb
+           ticks' = fromIntegral ticks
+           messages = mapMaybe 
+                      (toMessage shape change ticks) 
+                      (flat' (0,1) p)
+       --putStrLn $ "tick " ++ show ticks ++ " = " ++ show messages
        mapM_ (send s) messages
        return ()
 

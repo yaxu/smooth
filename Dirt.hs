@@ -20,13 +20,13 @@ dirt = OscShape {path = "/play",
                 }
 
 
-steps = 16
-channels = 4
-x = Map.insert (params dirt !! 0) (Just $ String "chin/0") $ defaultMap dirt
-x' pan = Map.insert (params dirt !! 4) (Just $ Float pan) $ x
-c = Cycle $ map (\i -> (Arc (Atom $ x' (channels * (fromIntegral i / fromIntegral steps))) (fromIntegral i / fromIntegral steps) Nothing)) [0 .. (steps - 1)]
+--steps = 16
+--channels = 4
+--x = Map.insert (params dirt !! 0) (Just $ String "chin/0") $ defaultMap dirt
+--x' pan = Map.insert (params dirt !! 4) (Just $ Float pan) $ x
+--c = Cycle $ map (\i -> (Arc (Atom $ x' (channels * (fromIntegral i / fromIntegral steps))) (fromIntegral i / fromIntegral steps) 0)) [0 .. (steps - 1)]
 
-startdirt = start "127.0.0.1" "127.0.0.1" "deardirt" "127.0.0.1" 7771 dirt
+dirtstream name = stream "127.0.0.1" "127.0.0.1" name "127.0.0.1" 7771 dirt
 
 sample       = makeS dirt "sample"
 offset       = makeF dirt "offset"

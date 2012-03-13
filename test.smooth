@@ -1,3 +1,19 @@
-d <- dirtstream "dirt0"
+d <- dirtstream "dirt1"
 
-d $ sample "chin/0 ~ ~ ~"
+
+d2 <- dirtstream "dirt2"
+d silence
+ 
+:break flat2
+flat2 (0,1) $ (toPattern "abc" :: Pattern Char)
+:step
+flat2 (0,2/1) $ ("a b [c d]" :: Pattern String)
+d2 silence
+
+reps x
+
+d silence
+d $ sample "bd/2"
+
+
+d silence
