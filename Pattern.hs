@@ -187,8 +187,8 @@ sinewave = Signal {at = f}
 sinewave1 :: Pattern Double
 sinewave1 = fmap ((/ 2) . (+ 1))  sinewave
 
-sample :: Int -> Pattern a -> Pattern a
-sample n s = Cycle ps
+discretise :: Int -> Pattern a -> Pattern a
+discretise n s = Cycle ps
   where
     d = 1 % (fromIntegral n)
     ps = map (\x ->
