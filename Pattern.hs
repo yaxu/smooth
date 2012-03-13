@@ -67,12 +67,9 @@ class Patternable p where
 instance Patternable [] where
   toPattern xs = Cycle ps
     where
-      ps = map (\x -> Arc {pattern = Atom $ xs !! x,
-                           onset = (fromIntegral x) /
-                                   (fromIntegral $ length xs),
-                           duration = Nothing
-                          }
-               ) [0 .. (length xs) - 1]
+      n = length xs
+      ps = zipWith mkArc xs [0..]
+      mkArc x i = Arc (Atom x) ((fromIntegral i) / (fromIntegral n)) Nothing
 
 {-size :: Pattern a -> Double
 size (Atom {})  = 1
