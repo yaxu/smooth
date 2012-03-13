@@ -28,15 +28,29 @@ instance Applicative Pattern where
   (Cycle fs) <*> xs = Cycle $ map (<*> xs) fs
   fs <*> (Cycle xs) = Cycle $ map (fs <*>) xs
 
-  fs@(Arc {onset = o}) <*> s@(Signal {}) = fs <*> (at s o)
   fs@(Arc {}) <*> xs@(Arc {}) | isIn fs xs = fs {pattern = (pattern fs) <*> (pattern xs)}
                               | otherwise = Silence
+
+--  fs@(Arc {onset = o}) <*> s@(Signal {}) = fs <*> (at s o)
+  fs@(Arc {onset = o}) <*> s@(Signal {}) = applySignal (0, 1) fs (at s)
 
   fs@(Signal {}) <*> xs = Signal $ (<*> xs) . (at fs)
   fs <*> xs@(Signal {}) = Signal $ (fs <*>) . (at xs)
   _ <*> Silence = Silence
   Silence <*> _ = Silence
 
+applySignal :: (Rational, Rational) -> Pattern (a -> b) -> (Rational -> Pattern a) -> Pattern b
+
+applySignal (o, s) p@(Cycle fs) sig
+  = Cycle $ map (\f -> applySignal (o, s) f sig) fs
+
+applySignal (o, s) p@(Arc {pattern = p', onset = o', scale = s'}) sig
+  = p {pattern = applySignal (o'', s'') p' sig}
+  where o'' = o + (o' * s)
+        s'' = o + ((o' + s') * s)
+
+applySignal (o, s) fs sig
+  = fs <*> (sig o)
 
 instance Monad Pattern where
   return = pure
@@ -59,7 +73,7 @@ instance Functor Pattern where
 
 instance (Show a) => Show (Pattern a) where
   show (Atom e) = show e
-  show (Arc p o d r) = concat ["[", show p, "@", show o, "x", show d, "]"]
+  show (Arc p o d r) = concat ["[", show p, "@(", show o, ")x(", show d, ")]"]
   show (Cycle ps) = "(" ++ (intercalate ", " (map show ps)) ++ ")"
   show (Signal s) = "*signal*"
   show Silence = "~"
@@ -168,29 +182,26 @@ combine = Cycle
 
 sinewave :: Pattern Double
 sinewave = Signal {at = f}
-  where f x = Arc {pattern = Atom $ (sin . (pi * 2 *)) (fromRational x),
-                   onset = mod' x 1,
-                   scale = 1,
-                   reps = 1
-                   }
+  where f x = Atom $ (sin . (pi * 2 *)) (fromRational x)
 
 sinewave1 :: Pattern Double
 sinewave1 = fmap ((/ 2) . (+ 1))  sinewave
 
-{-
-sample :: Int -> Signal a -> Pattern a
+sample :: Int -> Pattern a -> Pattern a
 sample n s = Cycle ps
   where
-    d = 1 / (fromIntegral n)
+    d = 1 % (fromIntegral n)
     ps = map (\x ->
                Arc {
-                 pattern = Atom (s $ (fromIntegral x) * d),
+                 pattern = (at s $ (fromIntegral x) * d),
                  onset = (fromIntegral x) * d,
-                 density = d
+                 scale = d,
+                 reps = 1
                  }
              )
          [0 .. (n - 1)]
 
+{-
 modulateOnset :: (a -> Double -> Double) -> Signal a -> Pattern b -> Pattern b
 modulateOnset f s p = mapOnset (\x -> f (s x) x) p
 
@@ -220,17 +231,22 @@ flatten (Cycle ps) = concatMap flatten ps
 flatten Silence = []
 
 flat :: (Rational, Rational) -> Pattern a -> [(Rational, a)]
+flat (o, d) (Silence) = []
 flat (o, d) (Atom e) = [(0, e)]
+flat (a, b) (Cycle ps) = concatMap (flat (a, b)) ps
 flat (a, b) Arc {pattern = p, onset = o, scale = s, reps = r} 
-  | isWithin = squash o s $ flat (a', b') p
+  | isWithin a b a' b' = squash o s $ flat (0 - ((a'-a)/s'), 1 + ((b-b')/s')) p
+--  | isWithin a b a' b' = squash o s $ flat (0 - ((a'-a)/s'), 1 + ((b-b')/s)) p
   | otherwise = []
   where s' = b - a
-        a' = (o - a) / s'
-        b' = a' + (s / s')
-        isWithin = (a' >= 0 && a' < 1) || (b' >= 0 && b' < 1)
+        a' = o
+        b' = o + s
 
-flat (a, b) (Cycle ps) = concatMap (flat (a, b)) ps
-flat _ Silence = []
+isWithin a b a' b' = or [a' >= a && a' < b,
+                         b' > a && b' <= b,
+                         a' <= a && b' >= b
+                        ]
+
 
 flat' :: (Rational, Rational) -> Pattern a -> [(Double, a)]
 flat' r p = mapFsts (fromRational) (flat r p)
