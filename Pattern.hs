@@ -5,6 +5,7 @@ import Data.Fixed
 import Data.List
 import Data.Maybe
 import Data.Ratio
+import Debug.Trace
 
 data Pattern a = Atom {event :: a}
              | Cycle {patterns :: [Pattern a]}
@@ -38,6 +39,12 @@ instance Applicative Pattern where
   fs <*> xs@(Signal {}) = Signal $ (fs <*>) . (at xs)
   _ <*> Silence = Silence
   Silence <*> _ = Silence
+
+_ %% 0 = 0
+a %% b = a % b
+
+_ // 0 = 0
+a // b = a / b
 
 applySignal :: (Rational, Rational) -> Pattern (a -> b) -> (Rational -> Pattern a) -> Pattern b
 
@@ -73,31 +80,27 @@ instance Functor Pattern where
 
 instance (Show a) => Show (Pattern a) where
   show (Atom e) = show e
-  show (Arc p o d r) = concat ["[", show p, "@(", show o, ")x(", show d, ")]"]
-  show (Cycle ps) = "(" ++ (intercalate ", " (map show ps)) ++ ")"
+  show (Arc p o d r) = concat [" [", show p, "@(", show o, ")x(", show d, ")] "]
+  show (Cycle ps) = " (" ++ (intercalate ", " (map show ps)) ++ ") "
   show (Signal s) = "*signal*"
   show Silence = "~"
+
 
 class Patternable p where
   toPattern :: p a -> Pattern a
 
 instance Patternable [] where
+  toPattern [] = Silence
   toPattern xs = Cycle ps
     where
-<<<<<<< HEAD
-      n = length xs
-      ps = zipWith mkArc xs [0..]
-      mkArc x i = Arc (Atom x) ((fromIntegral i) / (fromIntegral n)) Nothing
-=======
       ps = map (\x -> Arc {pattern = Atom $ xs !! x,
-                           onset = (fromIntegral x) %
+                           onset = (fromIntegral x) %%
                                    (fromIntegral l),
-                           scale = 1 % (fromIntegral l),
+                           scale = 1 %% (fromIntegral l),
                            reps = 1
                           }
                ) [0 .. l - 1]
       l = length xs
->>>>>>> b19758be4822b9ce98811259887619554c8717c9
 
 {-size :: Pattern a -> Double
 size (Atom {})  = 1
@@ -158,7 +161,7 @@ d ~> p = (0-d) <~ p
 cat :: [Pattern a] -> Pattern a
 cat ps = Cycle $ map a [0 .. (length ps) - 1]
   where l = length ps
-        s = 1 % (fromIntegral l)
+        s = 1 %% (fromIntegral l)
         a n = Arc {pattern = ps !! n,
                    onset = s * (fromIntegral n),
                    scale = s,
@@ -193,10 +196,17 @@ sinewave = Signal {at = f}
 sinewave1 :: Pattern Double
 sinewave1 = fmap ((/ 2) . (+ 1))  sinewave
 
+squarewave1 :: Pattern Double
+squarewave1 = Signal {at = f}
+  where f x = Atom $ fromIntegral $ floor $ (mod' (fromRational x) 1) * 2
+
+squarewave :: Pattern Double
+squarewave = fmap ((subtract 1) . (* 2)) squarewave1
+
 discretise :: Int -> Pattern a -> Pattern a
 discretise n s = Cycle ps
   where
-    d = 1 % (fromIntegral n)
+    d = 1 %% (fromIntegral n)
     ps = map (\x ->
                Arc {
                  pattern = (at s $ (fromIntegral x) * d),
@@ -226,28 +236,28 @@ mapSnd f (x,y) = (x,f y)
 mapSnds :: (a -> b) -> [(c, a)] -> [(c, b)]
 mapSnds = map . mapSnd
 
-flatten' :: Pattern a -> [(Double, a)]
-flatten' p = mapFsts (fromRational) (flatten p)
-
-flatten :: Pattern a -> [(Rational, a)]
-flatten (Atom e) = [(0, e)]
-flatten Arc {pattern = p, onset = o, scale = s, reps = r} =
-  squash o s $ flatten p
-flatten (Cycle ps) = concatMap flatten ps
-flatten Silence = []
-
 flat :: (Rational, Rational) -> Pattern a -> [(Rational, a)]
-flat (o, d) (Silence) = []
-flat (o, d) (Atom e) = [(0, e)]
-flat (a, b) (Cycle ps) = concatMap (flat (a, b)) ps
-flat (a, b) Arc {pattern = p, onset = o, scale = s, reps = r} 
-  | isWithin a b a' b' = squash o s $ flat (0 - ((a'-a)/s'), 1 + ((b-b')/s')) p
---  | isWithin a b a' b' = squash o s $ flat (0 - ((a'-a)/s'), 1 + ((b-b')/s)) p
+flat (o, s) (Silence) = []
+flat (o, s) (Atom e) | o <= 0 && (o+s) > 0  = [(0, e)]
+                     | otherwise = []
+flat (o, s) (Cycle ps) = concatMap (flat (o, s)) ps
+flat (a, s) Arc {pattern = p, onset = a', scale = s', reps = r} 
+  | isIn = squash a' s' $ flat (max a'' 0, min s'' 1) p
   | otherwise = []
-  where s' = b - a
-        a' = o
-        b' = o + s
+  where b = a+s
+        b' = a'+s'
+        ia = max a a'
+        ib = min b b'
+        is = ib - ia
+        a'' = (ia - a') / s'
+        b'' = (ib - a') / s'
+        s'' = b'' - a''
+        isIn = a'' < 1 && b'' > 0 && a'' < b''
+        isIn' = tr $ isIn
+        tr = trace $ intercalate ", " [show a, show b, show a', show b', show isIn]
+    
 
+isWithin :: Rational -> Rational -> Rational ->  Rational -> Bool
 isWithin a b a' b' = or [a' >= a && a' < b,
                          b' > a && b' <= b,
                          a' <= a && b' >= b
@@ -255,7 +265,7 @@ isWithin a b a' b' = or [a' >= a && a' < b,
 
 
 flat' :: (Rational, Rational) -> Pattern a -> [(Double, a)]
-flat' r p = mapFsts (fromRational) (flat r p)
+flat' r p = mapFsts (\x -> fromRational $ (x - (fst r)) / snd r) (flat r p)
 
 
 squash :: Rational -> Rational -> [(Rational, a)] -> [(Rational, a)]
