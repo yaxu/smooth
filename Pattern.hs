@@ -32,7 +32,6 @@ instance Applicative Pattern where
   fs@(Arc {}) <*> xs@(Arc {}) | isIn fs xs = fs {pattern = (pattern fs) <*> (pattern xs)}
                               | otherwise = Silence
 
---  fs@(Arc {onset = o}) <*> s@(Signal {}) = fs <*> (at s o)
   fs@(Arc {onset = o}) <*> s@(Signal {}) = applySignal (0, 1) fs (at s)
 
   fs@(Signal {}) <*> xs = Signal $ (<*> xs) . (at fs)
@@ -54,7 +53,7 @@ applySignal (o, s) p@(Cycle fs) sig
 applySignal (o, s) p@(Arc {pattern = p', onset = o', scale = s'}) sig
   = p {pattern = applySignal (o'', s'') p' sig}
   where o'' = o + (o' * s)
-        s'' = o + ((o' + s') * s)
+        s'' = (o + ((o' + s') * s)) - o''
 
 applySignal (o, s) fs sig
   = fs <*> (sig o)
@@ -195,6 +194,16 @@ sinewave = Signal {at = f}
 
 sinewave1 :: Pattern Double
 sinewave1 = fmap ((/ 2) . (+ 1))  sinewave
+
+
+triwave1 :: Pattern Double
+triwave1 = Signal {at = f}
+  where f x = Atom $ mod' (fromRational x) 1
+
+triwave :: Pattern Double
+triwave = Signal {at = f}
+  where f x = fmap ((subtract 1) . (*2)) triwave1
+
 
 squarewave1 :: Pattern Double
 squarewave1 = Signal {at = f}
