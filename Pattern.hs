@@ -23,11 +23,11 @@ joinPattern = mapAtom (\(Atom x) -> x)
 instance Applicative Pattern where
   pure = Atom
 
-  Atom f <*> xs = f <$> xs
-  fs <*> (Atom x) = (\f -> f x) <$> fs
-
   (Cycle fs) <*> xs = Cycle $ map (<*> xs) fs
   fs <*> (Cycle xs) = Cycle $ map (fs <*>) xs
+  
+  Atom f <*> xs = f <$> xs
+  fs <*> (Atom x) = (\f -> f x) <$> fs
 
   fs@(Arc {}) <*> xs@(Arc {}) | isIn fs xs = fs {pattern = (pattern fs) <*> (pattern xs)}
                               | otherwise = Silence
@@ -65,8 +65,8 @@ instance Monad Pattern where
     --where s n = mapAtom (\x -> mapAtom (\f -> Atom $ (event f) (event x)) (at fs n)) xs
 
 isIn :: Pattern a -> Pattern b -> Bool
-isIn (Arc {onset = o1}) (Arc {onset = o2, reps = r2})
-  = (o1 >= o2 && o1 < (o2 + r2)) 
+isIn (Arc {onset = o1}) (Arc {onset = o2, scale = s})
+  = (o1 >= o2 && o1 < (o2 + s)) 
     -- || (r2 == 0 && o1 == o2)
 isIn _ _ = False
 
