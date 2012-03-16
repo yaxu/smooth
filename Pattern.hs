@@ -164,7 +164,7 @@ cat ps = Cycle $ map a [0 .. (length ps) - 1]
         a n = Arc {pattern = ps !! n,
                    onset = s * (fromIntegral n),
                    scale = s,
-                   reps = 1
+                   reps = s
                   }
 
 every :: Int -> (Pattern a -> Pattern a) -> Pattern a -> Pattern a
@@ -253,18 +253,20 @@ flat (o, s) (Cycle ps) = concatMap (flat (o, s)) ps
 flat (a, s) Arc {pattern = p, onset = a', scale = s', reps = r} 
   | isIn = squash a' s' $ flat (max a'' 0, min s'' 1) p
   | otherwise = []
-  where b = a+s
-        b' = a'+s'
-        ia = max a a'
-        ib = min b b'
-        is = ib - ia
-        a'' = (ia - a') / s'
-        b'' = (ib - a') / s'
-        s'' = b'' - a''
-        isIn = a'' < 1 && b'' > 0 && a'' < b''
-        isIn' = tr $ isIn
-        tr = trace $ intercalate ", " [show a, show b, show a', show b', show isIn]
-    
+    where 
+      cycles = floor o
+      offset = ((fromIntegral cycles) * reps) mod' 1
+      b = a+s
+      b' = a'+s'
+      ia = max a a'
+      b = min b b'
+      s = ib - ia
+      a'' = (ia - a') / s'
+      b'' = (ib - a') / s'
+      s'' = b'' - a''
+      isIn = a'' < 1 && b'' > 0 && a'' < b''
+      isIn' = tr $ isIn
+      tr = trace $ intercalate ", " [show a,show b,show a',show b',show isIn]
 
 isWithin :: Rational -> Rational -> Rational ->  Rational -> Bool
 isWithin a b a' b' = or [a' >= a && a' < b,

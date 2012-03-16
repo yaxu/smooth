@@ -107,7 +107,8 @@ onTick s shape patternM change ticks
   = do p <- readMVar patternM
        let tpb' = 4 :: Integer
            ticks' = (fromIntegral ticks) :: Integer
-           a = (ticks' `mod` tpb') % tpb'
+           a = ticks' % tpb'
+           --a = (ticks' `mod` tpb') % tpb'
            b = 1 % tpb'
            messages = mapMaybe 
                       (toMessage shape change ticks) 
