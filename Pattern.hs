@@ -250,25 +250,25 @@ flat (o, s) (Silence) = []
 flat (o, s) (Atom e) | o <= 0 && (o+s) > 0  = [(0, e)]
                      | otherwise = []
 flat (o, s) (Cycle ps) = concatMap (flat (o, s)) ps
-flat (o, s) Arc {pattern = p, onset = a', scale = s', reps = 1} 
+flat (a, s) Arc {pattern = p, onset = a', scale = s', reps = r} 
   | isIn = squash a' s' $ flat (max a'' 0, min s'' 1) p
   | otherwise = []
-    where 
-      a = mod' o 1
-      b = a+s
-      b' = a'+s'
-      ia = max a a'
-      ib = min b b'
-      s = ib - ia
-      a'' = (ia - a') / s'
-      b'' = (ib - a') / s'
-      s'' = b'' - a''
-      isIn = a'' < 1 && b'' > 0 && a'' < b''
-      isIn' = tr $ isIn
-      tr = trace $ intercalate ", " [show a,show b,show a',show b',show isIn]
-flat (o, s) arc@(Arc {pattern = p, onset = o', scale = s', reps = r})
-  = flat (o, s) (arc {reps = 1, scale = s' / r, onset = o' + (mod' o r)})
-  where 
+  where b = a+s
+        b' = a'+s'
+        ia = max a a'
+        ib = min b b'
+        is = ib - ia
+        a'' = (ia - a') / s'
+        b'' = (ib - a') / s'
+        s'' = b'' - a''
+        isIn = a'' < 1 && b'' > 0 && a'' < b''
+        isIn' = tr $ isIn
+        tr = trace $ intercalate ", " [show a, show b, show a', show b', show isIn]    
+  
+
+--flat (o, s) arc@(Arc {pattern = p, onset = o', scale = s', reps = r})
+--  = flat (o, s) (arc {reps = 1, scale = s' / r, onset = o' + (mod' o r)})
+--  where 
         
 
 isWithin :: Rational -> Rational -> Rational ->  Rational -> Bool
