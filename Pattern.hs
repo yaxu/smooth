@@ -79,7 +79,7 @@ instance Functor Pattern where
 
 instance (Show a) => Show (Pattern a) where
   show (Atom e) = show e
-  show (Arc p o d r) = concat [" [", show p, "@(", show o, ")x(", show d, ")] "]
+  show (Arc p o d r) = concat [" [", show p, "@(", show o, ")x(", show d, ")-(", show r, ")"]
   show (Cycle ps) = " (" ++ (intercalate ", " (map show ps)) ++ ") "
   show (Signal s) = "*signal*"
   show Silence = "~"
@@ -146,10 +146,10 @@ mapOnset :: (Rational -> Rational) -> Pattern a -> Pattern a
 mapOnset f p = mapArc (\p' -> p' {onset = f $ onset p'}) p
 
 rev :: Pattern a -> Pattern a
-rev = mapOnset (1 -)
+rev = mapOnset (\x -> x + (((ceiling x)%1) - x))
 
 (<~) :: Rational -> Pattern a -> Pattern a
-d <~ p = mapOnset (\x -> mod' (x - d) 1) p
+d <~ p = mapOnset (\x -> ((floor x) % 1) + (mod' (x+d) 1)) p
 
 (~>) :: Rational -> Pattern a -> Pattern a
 d ~> p = (0-d) <~ p
@@ -158,18 +158,19 @@ d ~> p = (0-d) <~ p
 -- assumes equal scale..
 
 cat :: [Pattern a] -> Pattern a
+cat [] = Silence
 cat ps = Cycle $ map a [0 .. (length ps) - 1]
   where l = length ps
-        s = 1 %% (fromIntegral l)
+        s = 1 % (fromIntegral l)
         a n = Arc {pattern = ps !! n,
                    onset = s * (fromIntegral n),
                    scale = s,
-                   reps = s
+                   reps = 1
                   }
 
 every :: Int -> (Pattern a -> Pattern a) -> Pattern a -> Pattern a
 every 0 _ p = p
-every n f p = cat $ (take (n-1) $ repeat p) ++ [f p]
+every n f p = slow (fromIntegral n %1) $ cat $ (take (n-1) $ repeat p) ++ [f p]
 
 
 --cat :: [Pattern a] -> Pattern a
@@ -246,14 +247,32 @@ mapSnds :: (a -> b) -> [(c, a)] -> [(c, b)]
 mapSnds = map . mapSnd
 
 flat :: (Rational, Rational) -> Pattern a -> [(Rational, a)]
-flat (o, s) (Silence) = []
-flat (o, s) (Atom e) | o <= 0 && (o+s) > 0  = [(0, e)]
-                     | otherwise = []
-flat (o, s) (Cycle ps) = concatMap (flat (o, s)) ps
-flat (a, s) Arc {pattern = p, onset = a', scale = s', reps = r} 
+flat (a, b) (Silence) = []
+flat (a, b) (Atom e) = foo -- trace ("\n" ++ show a ++ "/" ++ show b ++ "=" ++ show (map fst foo)) $ foo
+  where foo = map (\x -> (x%1,e)) [ceiling a .. (ceiling b) - 1]
+flat (a, b) (Cycle ps) = concatMap (flat (a, b)) ps
+
+flat (a, b) p@(Arc {pattern = p', onset = o', scale = s', reps = r'})
+  | a >= b = []
+  | otherwise = (mapFsts squash (flat (a'', b'') p')) ++ rest
+  where start = (floor a) % 1 -- start of loop
+        next = start + 1      -- next loop
+        b' = min b next       -- limit of present recursion along range
+        innerStart = (r'*start) -- inner loop start
+        innerNext = (r'*(start + 1))
+        a'' = min innerNext $ innerStart + (max 0 (((a - start) - o') / s'))
+        b'' = min innerNext $ innerStart + (max 0 (((b - start) - o') / s'))
+        rest = flat (next, b) p
+        squash x = start + o' + ((x - innerStart) * s')
+        
+        
+{-
+
+flat (o, s) Arc {pattern = p, onset = a', scale = s', reps = r} 
   | isIn = squash a' s' $ flat (max a'' 0, min s'' 1) p
   | otherwise = []
-  where b = a+s
+  where a = o
+        b = a+s
         b' = a'+s'
         ia = max a a'
         ib = min b b'
@@ -265,7 +284,7 @@ flat (a, s) Arc {pattern = p, onset = a', scale = s', reps = r}
         isIn' = tr $ isIn
         tr = trace $ intercalate ", " [show a, show b, show a', show b', show isIn]    
   
-
+-}
 --flat (o, s) arc@(Arc {pattern = p, onset = o', scale = s', reps = r})
 --  = flat (o, s) (arc {reps = 1, scale = s' / r, onset = o' + (mod' o r)})
 --  where 
@@ -279,10 +298,12 @@ isWithin a b a' b' = or [a' >= a && a' < b,
 
 
 flat' :: (Rational, Rational) -> Pattern a -> [(Double, a)]
-flat' r p = mapFsts (\x -> fromRational $ (x - (fst r)) / snd r) (flat r p)
+flat' r p = mapFsts (\x -> fromRational $ (x - (fst r)) / (snd r - fst r)) (flat r p)
 
+slow :: Rational -> Pattern a -> Pattern a
+slow x p = Arc p 0 x (1/x)
 
-squash :: Rational -> Rational -> [(Rational, a)] -> [(Rational, a)]
-squash o s es = mapFsts ((+ o) . (* s)) es
+--squash :: Rational -> Rational -> [(Rational, a)] -> [(Rational, a)]
+--squash o s es = mapFsts ((+ o) . (* s)) es
 
 

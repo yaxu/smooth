@@ -69,7 +69,7 @@ toMessage :: OscShape -> BpsChange -> Int -> (Double, OscMap) -> Maybe OSC
 toMessage s change ticks (o, m) =
   do m' <- applyShape' s m
      let beat = fromIntegral ticks / fromIntegral tpb
-         latency = 0.04
+         latency = 0.019
          logicalNow = (logicalTime change beat)
          beat' = (fromIntegral ticks + 1) / fromIntegral tpb
          logicalPeriod = (logicalTime change (beat + 1)) - logicalNow
@@ -107,13 +107,13 @@ onTick s shape patternM change ticks
   = do p <- readMVar patternM
        let tpb' = 4 :: Integer
            ticks' = (fromIntegral ticks) :: Integer
-           --a = ticks' % tpb'
-           a = (ticks' `mod` tpb') % tpb'
-           b = 1 % tpb'
+           a = ticks' % tpb'
+           --a = (ticks' `mod` tpb') % tpb'
+           b = (ticks' + 1) % tpb'
            messages = mapMaybe 
                       (toMessage shape change ticks) 
                       (flat' (a,b) p)
-       putStrLn $ (show a) ++ ", " ++ (show b)
+       --putStrLn $ (show a) ++ ", " ++ (show b)
        --putStrLn $ "tick " ++ show ticks ++ " = " ++ show messages
        mapM_ (send s) messages
        return ()
