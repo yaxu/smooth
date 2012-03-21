@@ -1,17 +1,49 @@
+d2 <- dirtstream "dirt2"
+d3 <- dirtstream "dirt3"
+d4 <- dirtstream "dirt4"
+
 d <- dirtstream "dirt1"
 
+d2 $ (Dirt.sample $ (slow $ 3%4) "bd [bd cp cp] bd [bd cp/1 cp/1]")
+  ~~ pan "0.75"
 
-d2 <- dirtstream "dirt2"
-d silence
-
-d $ Dirt.sample "[[[bd bd bd bd] [bd sn/3 [bd sn]] bd [sn/2 bd], bd/4 sn/4 bd sn/4, ~ [hh hh] ~ hh [hc hc] hc bd hc [hc/4 hc/2 hc/4 hc/2] hh ~ hc hc/3 hh ~ hh],]"
-  ~~ pan "0"
-
-d2 $ Dirt.sample "[[[bd bd bd bd bd] [bd sn/3 [bd sn]] bd [sn/2 bd], bd/4 sn/4 bd sn/4, ~ [hh hc/2 hh] ~ hh [hc hc hc] hc bd hc [hc/4 hc/4 hc/2] hh h hc hc/3 hh ~ hh], jvbass/0 ~ ~]"
-  ~~ pan "1"
-
-d $ Dirt.sample "bd/2 bd/2 bd/2 [bd/2 bd/2 bd/2 [bd/2 bd/2 bd/2 [bd/2 bd/2 bd/2  [bd/2 bd/2 bd/2 bd/2]]]]"
+d2 $ (Dirt.sample $ (slow $ 1%2) "bd [bd cp cp] bd [bd cp/1 cp/1]")
+  ~~ pan "0.25"
+  ~~ speed "1.2"
 
 d silence
 
+
+flat (0, 1) $ ("bd bd sn" :: Pattern String)
+
+~~ pan "[0 1]"
+
+2379 % 4, 595 % 1
+595 % 1, 2381 % 4
+2381 % 4, 1191 % 2
+1191 % 2, 2383 % 4
+
+
+d silence
+d2 silence
+
+d $ sample $ "[hardcore/4 hardcore/8 bd [bd bd bd] [hardcore/4 hardcore/4 hardcore/4] ~ hardcore/3 ~, bd sn/3 bd sn/4 bd sn/2]"
+
+d2 $ Dirt.sample "bd [bd, ~ bd bd bd bd] [bd/4 bd/2 bd/2] [bd [bd bd] [bd bd]], future future/2 future [chin chin chin] future/1"
+  ~~ pan "1 0 0.5"
+
+
+d3 $ pan "0 1" ~~ Dirt.sample "[[[bd bd bd bd] [bd sn/3 [bd sn]] bd [sn/2 bd], bd/4 sn/4 bd sn/4, ~ [hh hh] ~ hh [hc hc] hc bd hc [hc/4 hc/2 hc/4 hc/2] hh ~ hc hc/3 hh ~ hh],]"
+
+d2 $ Dirt.sample "[[[bd bd bd bd bd] [bd sn/3 [bd sn]] bd [sn/2 bd], bd/4 sn/4 bd sn/4, ~ [hh hc/2 hh] ~ hh [hc hc hc] hc bd hc [hc/4 hc/4 hc/2] hh ~ hc hc/3 hh ~ hh], jvbass/0 ~ ~]"
+  ~~ pan sinewave1
+
+d4 $ Dirt.sample "[bd/2 bd/2]" ~~ pan ((1-) <$> sinewave1)
+
+
+
+d silence
+d2 silence
+d3 silence
+d4 silence
 flat (0,1%2) ("bd bd bd bd" :: Pattern String)

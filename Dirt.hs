@@ -9,12 +9,14 @@ import Control.Concurrent.MVar
 
 dirt :: OscShape
 dirt = OscShape {path = "/play",
-                 params = [ S "sample" Nothing,
+                 params = [ S "sound" Nothing,
                             F "offset" (Just 0),
                             F "duration" (Just 1),
                             F "speed" (Just 1),
                             F "pan" (Just 0.5),
-                            F "velocity" (Just 0)
+                            F "velocity" (Just 0),
+                            S "vowel" (Just ""),
+                            F "start" (Just 0)
                           ],
                  timestamp = True
                 }
@@ -28,10 +30,15 @@ dirt = OscShape {path = "/play",
 
 dirtstream name = stream "127.0.0.1" "127.0.0.1" name "127.0.0.1" 7771 dirt
 
-sample       = makeS dirt "sample"
+sound        = makeS dirt "sound"
 offset       = makeF dirt "offset"
 duration     = makeF dirt "duration"
 speed        = makeF dirt "speed"
 pan          = makeF dirt "pan"
 velocity     = makeF dirt "velocity"
+vowel        = makeS dirt "vowel"
+start        = makeF dirt "start"
+
+sample :: String -> Int -> String
+sample name n = name ++ "/" ++ (show n)
 

@@ -9,6 +9,7 @@ import Debug.Trace
 
 data Pattern a = Atom {event :: a}
              | Cycle {patterns :: [Pattern a]}
+             | Composition {cf :: (Rational, Rational) -> Pattern a}
              | Signal {at :: Rational -> Pattern a}
              | Silence
              | Arc {pattern :: Pattern a,
@@ -29,10 +30,24 @@ instance Applicative Pattern where
   Atom f <*> xs = f <$> xs
   fs <*> (Atom x) = (\f -> f x) <$> fs
 
-  fs@(Arc {}) <*> xs@(Arc {}) | isIn fs xs = fs {pattern = (pattern fs) <*> (pattern xs)}
-                              | otherwise = Silence
+  fs@(Arc {reps = 1}) <*> xs@(Arc {reps = 1}) = down
+     where down | isIn fs xs = fs {pattern = (pattern fs) <*> (pattern xs)}
+                | otherwise = Silence
+
+  fs@(Arc {}) <*> xs@(Arc {}) = Composition f
+    where f r = a <*> b
+               where a | reps fs == 1 = fs
+                       | otherwise = flatten r fs
+                     b | reps xs == 1 = xs 
+                       | otherwise = flatten r xs
 
   fs@(Arc {onset = o}) <*> s@(Signal {}) = applySignal (0, 1) fs (at s)
+
+  (Composition f) <*> xs = Composition f'
+     where f' o = (f o) <*> xs
+
+  fs <*> (Composition f) = Composition f'
+      where f' o = fs <*> (f o)
 
   fs@(Signal {}) <*> xs = Signal $ (<*> xs) . (at fs)
   fs <*> xs@(Signal {}) = Signal $ (fs <*>) . (at xs)
@@ -75,12 +90,15 @@ instance Functor Pattern where
   fmap f p@(Arc {pattern = p'}) = p {pattern = fmap f p'}
   fmap f p@(Cycle {patterns = ps}) = p {patterns = fmap (fmap f) ps}
   fmap f p@(Signal _) = p {at = (fmap f) . (at p)}
+  fmap f p@(Composition f') = Composition $ \o -> fmap f (f' o)
+
   fmap _ Silence = Silence
 
 instance (Show a) => Show (Pattern a) where
   show (Atom e) = show e
-  show (Arc p o d r) = concat [" [", show p, "@(", show o, ")x(", show d, ")-(", show r, ")"]
+  show (Arc p o d r) = concat [" [", show p, "@(", show o, ")x(", show d, ")-(", show r, ")]"]
   show (Cycle ps) = " (" ++ (intercalate ", " (map show ps)) ++ ") "
+  show (Composition _) = "*composition*"
   show (Signal s) = "*signal*"
   show Silence = "~"
 
@@ -117,6 +135,7 @@ mapAtom f p@(Atom {}) = f p
 mapAtom f p@(Arc {pattern = p'}) = p {pattern = mapAtom f p'}
 mapAtom f p@(Cycle {patterns = ps}) = p {patterns = fmap (mapAtom f) ps}
 mapAtom f p@(Signal _) = p {at = fmap (mapAtom f) (at p)}
+mapAtom f (Composition f') = Composition (\o -> mapAtom f (f' o))
 mapAtom _ Silence = Silence
 
 filterP :: (Pattern a -> Bool) -> Pattern a -> Pattern a
@@ -127,6 +146,9 @@ filterP f p@(Cycle ps) | f p = p {patterns = map (filterP f) ps}
 filterP f p@(Arc {}) | f p = p {pattern = filterP f (pattern p)}
                      | otherwise = Silence
 filterP f p@(Signal {}) | f p = p {at = (filterP f) . (at p)}
+                        | otherwise = Silence
+filterP f p@(Composition f') | f p = Composition (\o -> filterP f (f' o))
+                        | otherwise = Silence
 filterP _ Silence = Silence
 
 mapArc :: (Pattern a -> Pattern a) -> Pattern a -> Pattern a
@@ -134,6 +156,8 @@ mapArc f p@(Atom {}) = p
 mapArc f p@(Arc {pattern = p'}) = f $ p {pattern = mapArc f p'}
 mapArc f p@(Cycle {patterns = ps}) = p {patterns = fmap (mapArc f) ps}
 mapArc f p@(Signal _) = p {at = fmap (mapArc f) (at p)}
+mapArc f (Composition f') = Composition (\o -> mapArc f (f' o))
+
 mapArc _ Silence = Silence
 
 
@@ -149,7 +173,7 @@ rev :: Pattern a -> Pattern a
 rev = mapOnset (\x -> x + (((ceiling x)%1) - x))
 
 (<~) :: Rational -> Pattern a -> Pattern a
-d <~ p = mapOnset (\x -> ((floor x) % 1) + (mod' (x+d) 1)) p
+d <~ p = Arc p (mod' (0 - d) 1) 1 1
 
 (~>) :: Rational -> Pattern a -> Pattern a
 d ~> p = (0-d) <~ p
@@ -234,6 +258,7 @@ modulateOnset f s p = mapOnset (\x -> f (s x) x) p
 wobble :: Double -> Pattern a -> Pattern a
 wobble d p = modulateOnset (+) (fmap (*d) sinewave) p
 -}
+
 mapFst :: (a -> b) -> (a, c) -> (b, c)
 mapFst f (x,y) = (f x,y)
 
@@ -246,12 +271,19 @@ mapSnd f (x,y) = (x,f y)
 mapSnds :: (a -> b) -> [(c, a)] -> [(c, b)]
 mapSnds = map . mapSnd
 
-flat :: (Rational, Rational) -> Pattern a -> [(Rational, a)]
+flat :: (Rational, Rational) -> Pattern a -> [((Rational, Rational), a)]
+
 flat (a, b) (Silence) = []
-flat (a, b) (Atom e) = foo -- trace ("\n" ++ show a ++ "/" ++ show b ++ "=" ++ show (map fst foo)) $ foo
-  where foo = map (\x -> (x%1,e)) [ceiling a .. (ceiling b) - 1]
+flat (a, b) (Atom e) = foo -- trace ("\n" ++ show e ++ ": " ++ show a ++ "/" ++ show b ++ "=" ++ show (map fst foo)) $ foo
+  where foo = map (\x -> ((x%1,(x+1)%1),e)) [ceiling a .. (ceiling b) - 1]
+flat (a, b) (Composition f) = flat (a,b) $ f (a,b)
+  where explode (x, y) = ((x * (b - a)) + a, (y * (b - a)) + a)
 flat (a, b) (Cycle ps) = concatMap (flat (a, b)) ps
 
+-- TODO - this is a bit of a hack for rotation
+flat (a, b) p@(Arc {pattern = p', onset = o', scale = 1, reps = 1})
+  = mapFsts (\(x, y) -> (x + o',y + o')) $ flat (a-o',b-o') p'
+  
 flat (a, b) p@(Arc {pattern = p', onset = o', scale = s', reps = r'})
   | a >= b = []
   | otherwise = (mapFsts squash (flat (a'', b'') p')) ++ rest
@@ -262,9 +294,15 @@ flat (a, b) p@(Arc {pattern = p', onset = o', scale = s', reps = r'})
         innerNext = (r'*(start + 1))
         a'' = min innerNext $ innerStart + (max 0 (((a - start) - o') / s'))
         b'' = min innerNext $ innerStart + (max 0 (((b - start) - o') / s'))
+--        a'' = min innerNext $ innerStart + (max 0 (((a - start) - o') / s'))
+--        b'' = min innerNext $ innerStart + (max 0 (((b - start) - o') / s'))
         rest = flat (next, b) p
-        squash x = start + o' + ((x - innerStart) * s')
+        squash (x,y) = (start + o' + ((x - innerStart) * s'),
+                        start + o' + ((y - innerStart) * s')
+                       )
+                       
         
+flat r p@(Signal _) = flat r $ discretise 64 p
         
 {-
 
@@ -298,12 +336,24 @@ isWithin a b a' b' = or [a' >= a && a' < b,
 
 
 flat' :: (Rational, Rational) -> Pattern a -> [(Double, a)]
-flat' r p = mapFsts (\x -> fromRational $ (x - (fst r)) / (snd r - fst r)) (flat r p)
+flat' r p = mapFsts (\(x,y) -> fromRational $ (x - (fst r)) / (snd r - fst r)) (flat r p)
 
 slow :: Rational -> Pattern a -> Pattern a
 slow x p = Arc p 0 x (1/x)
 
+unit :: Pattern a -> Bool
+unit p = reps p == (1 / scale p)
+
+flatten :: (Rational, Rational) -> Pattern a -> Pattern a
+flatten (x, y) p = Cycle $ map (\(o, s, e) -> (Arc (Atom e) o s 1)) xs
+  where xs = map norm $ flat (x,y) p
+        norm ((x', y'), e) = ((x' - x) / d, (y' - x')/d, e)
+        d = y - x
+
+
+
 --squash :: Rational -> Rational -> [(Rational, a)] -> [(Rational, a)]
 --squash o s es = mapFsts ((+ o) . (* s)) es
 
-
+run len = toPattern [0 .. len-1]
+scan n = cat $ map run [1 .. n]
