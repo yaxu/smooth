@@ -357,3 +357,4 @@ flatten (x, y) p = Cycle $ map (\(o, s, e) -> (Arc (Atom e) o s 1)) xs
 
 run len = toPattern [0 .. len-1]
 scan n = cat $ map run [1 .. n]
+

@@ -2,6 +2,9 @@ d2 <- dirtstream "dirt2"
 d3 <- dirtstream "dirt3"
 d4 <- dirtstream "dirt4"
 
+d2 $ explode (sound "bd") 4
+d2 silence
+
 d <- dirtstream "dirt1"
 
 d2 $ (Dirt.sample $ (slow $ 3%4) "bd [bd cp cp] bd [bd cp/1 cp/1]")
@@ -17,7 +20,7 @@ d silence
 flat (0, 1) $ ("bd bd sn" :: Pattern String)
 
 ~~ pan "[0 1]"
-
+a
 2379 % 4, 595 % 1
 595 % 1, 2381 % 4
 2381 % 4, 1191 % 2

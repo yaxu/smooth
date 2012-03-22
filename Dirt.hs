@@ -11,12 +11,12 @@ dirt :: OscShape
 dirt = OscShape {path = "/play",
                  params = [ S "sound" Nothing,
                             F "offset" (Just 0),
-                            F "duration" (Just 1),
+                            F "begin" (Just 0),
+                            F "end" (Just 1),
                             F "speed" (Just 1),
                             F "pan" (Just 0.5),
                             F "velocity" (Just 0),
-                            S "vowel" (Just ""),
-                            F "start" (Just 0)
+                            S "vowel" (Just "")
                           ],
                  timestamp = True
                 }
@@ -32,13 +32,17 @@ dirtstream name = stream "127.0.0.1" "127.0.0.1" name "127.0.0.1" 7771 dirt
 
 sound        = makeS dirt "sound"
 offset       = makeF dirt "offset"
-duration     = makeF dirt "duration"
+begin        = makeF dirt "begin"
+end          = makeF dirt "end"
 speed        = makeF dirt "speed"
 pan          = makeF dirt "pan"
 velocity     = makeF dirt "velocity"
 vowel        = makeS dirt "vowel"
-start        = makeF dirt "start"
 
 sample :: String -> Int -> String
 sample name n = name ++ "/" ++ (show n)
 
+explode :: OscPattern -> Int -> OscPattern
+explode p n = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
+  where off i p = p ~~ begin (Atom (fromIntegral i / fromIntegral n)) ~~ end (Atom (fromIntegral (i+1) / fromIntegral n))
+        
