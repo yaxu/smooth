@@ -42,7 +42,7 @@ vowel        = makeS dirt "vowel"
 sample :: String -> Int -> String
 sample name n = name ++ "/" ++ (show n)
 
-explode :: OscPattern -> Int -> OscPattern
-explode p n = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
+striate :: OscPattern -> Int -> OscPattern
+striate p n = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
   where off i p = p ~~ begin (Atom (fromIntegral i / fromIntegral n)) ~~ end (Atom (fromIntegral (i+1) / fromIntegral n))
         
