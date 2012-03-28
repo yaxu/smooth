@@ -10,6 +10,7 @@ import Control.Concurrent
 import Control.Concurrent.MVar
 import Pattern
 import Data.Ratio
+--import Control.Exception
 
 import qualified Data.Map as Map
 
@@ -115,7 +116,7 @@ onTick s shape patternM change ticks
                       (flat' (a,b) p)
        --putStrLn $ (show a) ++ ", " ++ (show b)
        --putStrLn $ "tick " ++ show ticks ++ " = " ++ show messages
-       mapM_ (send s) messages
+       catch (mapM_ (send s) messages) (\msg -> putStrLn $ "oops " ++ show msg)
        return ()
 
 
