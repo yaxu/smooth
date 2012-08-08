@@ -1,0 +1,30 @@
+-- combine with self shifted
+(\x -> combine [x, (1%8) ~> x])
+
+-- combine with self denser
+(\x -> combine [x, density 2 x])
+
+-- move around
+pan (sinewave1)
+
+-- slow parts
+slow 8
+
+-- dense parts
+density 8
+
+-- striate
+d4 $ slow 2 $ striate (sound $ "") 64
+
+-- sample switch
+(sample <$> "jvbass jvbass [jvbass [jvbass jvbass]]" <*> "[1 6]")
+
+-- density step
+every 2 (density 2)
+
+-- rotate
+every 2 ((1%8) <~)
+
+-- concatenate things of different densities, striations etc
+(\x -> cat [slow 3 x, slow 4 x, slow 2 x, slow 8 x]) (striate (sound "cr/2") 32)
+  ~~ pan "0 1 2 3"
