@@ -46,3 +46,7 @@ striate :: OscPattern -> Int -> OscPattern
 striate p n = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
   where off i p = p ~~ begin (Atom (fromIntegral i / fromIntegral n)) ~~ end (Atom (fromIntegral (i+1) / fromIntegral n))
         
+striateO :: OscPattern -> Int -> Double -> OscPattern
+striateO p n o = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
+  where off i p = p ~~ begin (Atom $ (fromIntegral i / fromIntegral n) + o) ~~ end (Atom $ (fromIntegral (i+1) / fromIntegral n) + o)
+
