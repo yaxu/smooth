@@ -1,0 +1,22 @@
+d1 $ every 2 (density (1%2)) $ sound "[bd bd bd bd] [bd bd bd] bd"
+  ~~ pan "0"
+
+d2 $ every 3 ((1%2) <~) $ sound ("[bd bd [bd [sn/2 sn/2]]]")
+  ~~ pan "[1 0]"
+
+d3 $ (\x -> cat [slow 3 x, slow 4 x, slow 2 x, slow 6 x]) (striate (sound "bd/2") 32)
+  ~~ pan "[1 0]"
+
+d1 $ (0) <~ (slow 4 $ striate (sound "bd can [~ [bd bd]] [sn sn sn]") 16
+  ~~ pan "1" ~~ speed "0.5")
+
+d2 $ (1%2) <~ (slow 6 $ striate (sound "bd can [~ [bd bd]] [sn sn sn]") 16
+  ~~ pan "0" ~~ speed "0.5")
+
+d4 $ sound (sample <$> ("[bd bd [bd bd bd], [bd bd bd] [bd bd bd bd]]") <*> "[1 2 4]")
+  ~~ speed "0.8"
+
+d5 $ sound "~ [~ off]"
+  ~~ speed "0.5"
+  ~~ end "0.25"
+

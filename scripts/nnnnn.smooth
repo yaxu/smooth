@@ -1,0 +1,30 @@
+d1 <- dirtstream "dirt1"
+d2 <- dirtstream "dirt2"
+d3 <- dirtstream "dirt3"
+d4 <- dirtstream "dirt4"
+
+
+d1 $ sample "bd ht [lt ht bd]"
+  ~~ pan "1 0"
+
+d2 $ sample "bd [bd bd bd] [lt ht bd]"
+  ~~ pan "0 1"
+d2 silence
+
+d4 $ sample "[]"
+  ~~ pan "0"
+  ~~ speed "0.3"
+d1 silence
+
+d3 $ sample "[~ ~ jvbass/0 ~ , ~ jvbass/2 ~ bd jvbass/8 ~, bd bd]"
+  ~~ speed "1"
+  ~~ pan "1"
+
+d2 $ sample "[jvbass/4 jvbass/0 ~ , ~ jvbass/2 bd jvbass/8 ~, bd ~ ~ ~]"
+  ~~ speed "0.4"
+  ~~ pan "0"
+
+d1 $ sample "[industrial/2 mouth/3 jvbass/4, mouth/4 [mouth/5 mouth/5 mouth/3] ~]"
+  ~~ duration "0.5"
+  ~~ speed "0.5"
+

@@ -1,0 +1,43 @@
+
+d1 $ sound "bd bd bd bd"
+  ~~ pan "0 1 2 3"
+
+
+
+d1 $ every 2 (density 4) $ (sound "[kurt kurt/1] [kurt/2 kurt/3 kurt/4]")
+  ~~ (pan "0 1")
+  ~~ vowel "e"
+  ~~ speed "3"
+
+d2 $ every 2 (density 2) $ ((1%4) <~ sound "[kurt kurt/1] [kurt/2 kurt/3 kurt/4]")
+  ~~ pan "0 1"
+  ~~ vowel "a"
+  ~~ speed "2"
+
+d2 silence
+
+d3 $ density 2 $ sound "bd sn"
+  ~~ pan (slow 8 ((*4)<$> sinewave1))
+  ~~ speed "4"
+
+d4 $ every 4 (density 2) $ sound "[bd sn [cp bd] sn, bd bd bd]"
+  ~~ pan "2.5"
+  ~~ speed "2"
+
+d5 $ (\x -> cat [slow 3 x, slow 4 x, slow 2 x, slow 6 x]) (striate (sound "cr/2") 16)
+  ~~ pan "0 1 2 3"
+
+d8 $ (slow 2 (striate (sound "tabla/2 tabla/3") 8))
+  ~~ pan "2.5"
+  ~~ speed "[0.6,0.5]"
+  ~~ vowel "o"
+
+d6 $ slow 8 $ striate (sound $ "sheffield") 128
+  ~~ (slow 8 $ pan ((*1) <$> sinewave1))
+
+d8 $ sound "bd future wobble"
+
+d9 $ sound "[bd [bd bd bd] bd bd] [off bd bd]"
+  ~~ vowel "e"
+  ~~ pan sinewave
+  

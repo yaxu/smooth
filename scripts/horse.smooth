@@ -1,0 +1,24 @@
+d1 $ slow 3 $ every 2 (~~ vowel "o" ~~ speed "0.9") (slow 3 $ sound "~ ~ ~ [hand/4 hand/4 hand/3] ~ hand/4 ~ ~"
+~~ pan "0")
+~~ speed "0.2"
+~~ vowel "i"
+
+d2 $ slow 2 $ sound "~ hand/3 ~ [hand/4 hand/4 hand/4] ~ hand/4 ~ ~"
+~~ pan "0.4"
+~~ speed "3"
+
+
+d3 $ slow 3 ( sound "hand/9 hand/4 ~ [hand/4 ~ hand/6]")
+  ~~  pan (sinewave1) 
+  ~~ vowel "a e"
+
+
+d4 $ slow 4 $ striate (sound "hand/9 hand/6 hand/12") 128
+  ~~ pan "[1 0]"
+  ~~ speed "0.3"
+  ~~ vowel "e"
+
+d5 $ every 2 ((1%4) <~) (sound (sample <$> "hand hand ~ [hand ~ [hand hand]]" <*> (slow 5 "1 2 5 4 15")))
+
+d6 $ slow 2 $ every 4 ((1%8) <~) (sound "hand/5 [hand/4 hand/3 hand/4] [~ hand/5] ~"
+  ~~ pan "0 1" ~~ speed "0.04")

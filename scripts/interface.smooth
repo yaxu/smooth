@@ -1,0 +1,35 @@
+d1 $ (sound $ combine ["[bd cp bd] [bd/2 bd/4 cp [bd/3 bd] cp bd]", "sn/3 off cr"])
+  ~~ vowel "o"
+
+
+d1 silence
+d2 $ (slow 3 $ striate (sound "[bd bd bd] [bd bd [bd bd] bd]") 8)
+  ~~ pan "1"
+  ~~ end "0.1"
+d2 silence
+d3 $ every 3 (slow 2) $ (sound $ cat [slow 2 $ "bd [bd bd sn] [~ sn/2] bd",
+                  slow 3 $ (sample <$> "bd bd [kurt [h bd]]" <*> "1 2 3 4")
+                ])
+  ~~ pan sinewave1
+  ~~ end "0.15"
+
+d4 $ (sound $ cat [slow 2 $ "bd [bd kurt/3 sn] [~ kurt] bd",
+                  slow 3 $ "bd bd [bd [bd bd]]"
+                ])
+  ~~ pan "2 3"
+  ~~ end "0.5"
+
+d5 $ every 3 ((1%2) <~) $sound "[bd ~ bd] sn [~ [[bd [bd bd] bd] drum/2]] sn"
+
+  
+d5 $ (\x -> cat [slow 3 x, slow 2 x, slow 3 x, slow 8 x]) (striate (sound "off/2") 4)
+  ~~ pan "2 3"
+  ~~ vowel "e"
+
+d6 $ every 2 (slow 3) $ (\x -> cat [slow 3 x, slow 2 x, slow 3 x, slow 8 x]) (striate (sound "sax/2") 4)
+  ~~ pan "2 3 1 0"
+  ~~ vowel "a e"
+  ~~ speed "[3 2 1]"
+
+d7 $ sound (every 3 ((1%3) <~) "[future/0 future/1 future/0] wobble [jvbass/2 jvbass/3]")
+  ~~ speed "1.2"

@@ -1,0 +1,21 @@
+d1 $ sound "bd [bd [bd [bd bd] bd bd] bd] bd"
+  ~~ pan "0"
+
+d7 $ slow 8 $ sound "bd [bd [bd [bd bd] bd bd] bd] bd"
+  ~~ end "0.04"
+
+d2 $ sound "sn/3 sn/4 sn/3 sn/4"
+
+
+d3 $ (sound $ (\x -> combine [x, (1%8) ~> x]) "bass/1 bass/1 bass bass/2 bass bass/1")
+  ~~ speed "1"
+
+d3 $ slow 4 $ ((\x -> combine [x, (1%12) ~> x, ((1%16) ~> x) ~~ vowel "a"]) $ sound "bass/1 bass/1 bass bass/1 bass bass/1")
+  ~~ speed "1"
+
+d4 $ slow 3 $ ((\x -> combine [x, (1%12) ~> x, ((1%16) ~> x) ~~ vowel "a"]) $ sound "bass/1 bass/1 bass bass/2 bass bass/1")
+  ~~ speed "2 1 0.5"
+
+d5 $ combine [density 2 $ sound "bd sn/2 [~ [bd/2 bd/4 bd/3]] [sn/2, cp]", density 8 $ sound "~ hc/7"]
+  ~~ pan sinewave
+

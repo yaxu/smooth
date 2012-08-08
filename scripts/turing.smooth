@@ -1,0 +1,51 @@
+d4 $ slow 2 $ striate (sound $ "sheffield") 64
+  ~~ (pan ((* 3) <$> sinewave1))
+  ~~ vowel "o"
+
+d2 $ sound "sn/4 [sn/4 [sn/1 sn/1] [sn/3 sn/3 sn/3]]"
+  ~~ pan "0"
+
+d4 $ sound "bd/4 [bd/4 [bd/1 bd/1 bd/3] [bd/3 bd/3 bd/3]]"
+
+d5 $ sound "bd sn/2 [~ bd/2 bd] sn/2"
+  ~~ pan "0"
+
+d1 $ sound "bd sn/3 [~ bd/2 bd/2 bd/2] sn/2"
+  ~~ pan "1"
+
+d1 $ sound "bd/4 sn/5 [~ future/2 ht/2 ht/2 ht/2] sn/4"
+  ~~ pan "1"
+
+d3 $ (sound $ (\x -> combine [x, (1%8) ~> x]) "bass/1 bass/1 bass bass/1")
+  ~~ speed "1"
+
+d1 $ (\x -> combine [x, density 3 x]) $ (sound $ "bd [bd bd] sn sn ~")
+  ~~ pan "0"
+
+d2 $ (\x -> combine [x, density 2 x]) $ (sound $ "bd [bd bd] sn sn ~")
+  ~~ pan "1"
+
+d3 silence
+
+d1 $ sound "bd bd [sn [sn sn/2] sn] sn"
+  ~~ pan ((* 2) <$> (slow 8 sinewave))
+  ~~ begin "0.1"
+
+d2 $ sound (((1%8) <~) "bd bd [sn [sn sn/2] sn] sn")
+  ~~ pan ((3 -) <$> ((* 2) <$> (slow 8 sinewave)))
+  ~~ begin "0.1"
+
+d3 $ (\x -> combine [slow 2 x, slow 3 x]) $ sound (sample <$> "kurt [kurt [kurt kurt] kurt] [kurt kurt]" <*> "0 1 2 4") ~~ pan sinewave1
+
+
+d4 $ cat [(slow 4 $ striate (sound "cr/5" ~~ speed "0.5" ~~ pan "0.25 0.75") 16),
+          0.5 <~ (slow 4 $ striate (sound "cr/1" ~~ speed "1" ~~ pan "0.25 0.75") 8),
+          0.5 <~ (slow 4 $ striate (sound "cr/5" ~~ speed "0.5" ~~ pan "0.25 0.75") 16),
+          0.5 <~ (slow 4 $ striate (sound "cr/1" ~~ speed "1" ~~ pan "0.25 0.75") 32)
+          ]
+
+d4 $ (\x -> cat [slow 3 x, slow 4 x, slow 2 x, slow 8 x]) (striate (sound "cr/2 h") 32)
+  ~~ pan "[0 1 2 3]"
+
+d1 $ density 2 $ sound "ht [ht ht] ht lt"
+  ~~ pan "[0 1 2 3]"

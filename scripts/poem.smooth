@@ -1,0 +1,38 @@
+d1 $ every 2 (~~ vowel "a") $ sound ((\x -> combine [x, density 4 x]) (sample <$> "kurt [kurt kurt kurt] kurt" <*> "1 2 3"))
+  ~~ pan "0 1"
+  ~~ speed "0.8"
+
+d2 $ every 2 (density 3) $ every 2 (density 6) $ sound "chin chin"
+  ~~ pan "0.6"
+
+d3 $ every 2 (density 2) $ every 2 (density 4) $ sound "chin chin"
+  ~~ pan "0"
+  ~~ speed "0.5"
+
+d4 $ every 3 (density 3) $ every 2 (density 2) $ sound "chin chin"
+  ~~ pan "2"
+  ~~ speed "0.5"
+
+d5 $ every 3 (density 3) $ every 5 (density 2) $ sound "chin chin"
+  ~~ pan "3"
+  ~~ speed "0.3"
+
+d6 $ sound "[bd bd] [odx odx odx]"
+  ~~ end "0.02"
+  ~~ pan "2"
+  ~~ speed "2"
+
+d7 $ every 3 ((1%4) <~) $ sound "[bd bd bd] [odx odx odx odx]"
+  ~~ end "0.02"
+  ~~ pan "3"
+  ~~ speed "1.4"
+
+d8 $ (\x -> cat [slow 3 x, slow 4 x, slow 2 x, slow 8 x]) (striate (sound "cr/2") 32)
+  ~~ pan "0 1 2 3"
+
+d9 $ sound (cat ["bd [~ [sn sn sn]] bd [sn bd]", "bd sn sn"])
+  ~~ pan "0"
+
+d10 $ every 3 ((1%2) <~) (sound (cat ["bd [~ [sn sn sn]] bd [sn bd]", "bd sn sn"]))
+  ~~ pan "1"
+

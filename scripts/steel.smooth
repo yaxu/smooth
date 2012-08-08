@@ -1,0 +1,34 @@
+
+d1 $ cat [(slow 3 $ striate (sound "bd" ~~ speed "0.5" ~~ pan "[1 0 0.5]") 32), (sound "bd cr/2 bd" ~~ speed "30")]
+  ~~ pan "[1 0]"
+
+d2 $ sound (every 3 (density 3) "sn cr/2")
+  ~~ speed "20"
+
+d3 $ every 3 (0.25 <~) $ sound ("future [~ bd/4] cr/9 ~")
+  ~~ speed "2"
+
+d4 $ cat [(slow 4 $ striate (sound "cr/5" ~~ speed "0.5" ~~ pan "0.25 0.75") 16),
+          0.5 <~ (slow 4 $ striate (sound "cr/1" ~~ speed "1" ~~ pan "0.25 0.75") 8),
+          0.5 <~ (slow 4 $ striate (sound "cr/5" ~~ speed "0.5" ~~ pan "0.25 0.75") 16),
+          0.5 <~ (slow 4 $ striate (sound "cr/1" ~~ speed "1" ~~ pan "0.25 0.75") 32)
+          ]
+
+d1 silence
+
+d5 $ slow (3) $ sound "[bd [~ ~ bd] bd bd, cr/5 rm rm]"
+  ~~ end "0.20"
+  ~~ speed "1.5"
+  ~~ pan "0"
+
+d6 $ slow (3) $ sound "[bd [bd [~ sn/2 ~] ~] bd bd, rm cr/4 rm]"
+  ~~ end "0.25"
+  ~~ speed "1.4"
+  ~~ pan "1"
+
+d7 $ slow 6 $ every 3 (density (1%3)) $ sound (sample <$> "jvbass jvbass [jvbass [jvbass jvbass]]" <*> "[1 6]")
+  ~~ speed "[1.3,6.2,2.3]"
+
+d8 $ slow 6 $ every 4 (density (1%3)) $ sound (sample <$> "jvbass jvbass [jvbass [jvbass jvbass ~]]" <*> "[1 6]")
+  ~~ speed (every 2 ((*2) <$>) "[3.9,1.5,1.3]")
+

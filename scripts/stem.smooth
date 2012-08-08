@@ -1,0 +1,3 @@
+d1 $ (sound $ (sample <$> "[bd bd] sn bd [bd bd bd] bd [sn sn] bd bd" <*> ( ((floor . (* 16)) <$> (slow 4 sinewave1)))))
+  ~~ duration (slow 4 ((+0.1) <$> sinewave1))
+  ~~ speed "0.5"

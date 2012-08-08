@@ -1,0 +1,61 @@
+d1 $ sound "bd"
+d1 $ sound "bd bd"
+
+d1 $ slow 2 $ sound "bd bd"
+
+d1 $ sound "bd bd bd"
+d1 $ sound "bd [bd bd] bd"
+d1 $ sound "bd [bd bd bd] bd"
+d1 $ sound "bd [bd [bd bd bd bd bd bd] bd] bd"
+
+d1 $ sound "[bd drum/2] [bd drum/2] [bd drum/2 drum/2]"
+
+d1 $ sound "[bd drum/2] [bd drum/2] [bd drum/2 drum/2]"
+  ~~ pan "0"
+
+d2 $ sound "[bd drum/2] [bd drum/2 drum/2] [bd drum/2]"
+  ~~ pan "1"
+
+d2 silence
+
+d1 $ sound "sax"
+
+d1 $ striate (sound "sax") 128
+d2 $ sound "bd [sn sn/2 sn]"
+d1 silence
+
+d1 $ slow 2 $ striate (sound "sax") 16
+  ~~ speed "2"
+
+d1 $ slow 2 $ striate (sound "sax") 16
+  ~~ pan sinewave1
+
+d1 $ sound $ combine ["bd ~ sn/4 ~ ~ bd [sn/2 bd] ~", density 32 "hh"]
+
+d1 $ sound $ combine ["bd ~ sn/4 ~ ~ bd sn/2 ~", density 6 "hh bd"]
+
+d1 $ sound $ every 3 ((1%4) <~) "bd ~ sn/4 ~ ~ bd sn/2 ~"
+
+d1 $ every 4 ((1%8) <~) $ slow (1%4) $ striate (sound "bd drum/1 sn/2 off") 64
+  ~~ pan (slow 8 sinewave1)
+  ~~ speed "1"
+
+
+d1 $ slow 4 $ striate (sound "[sitar/3 fire ~ tabla/6, ~ sitar/2]") 32
+  ~~ speed "2.2"
+  ~~ pan "[0.5, 0]"
+
+d2 $ slow 4 $ striate (sound "[sitar/3 ~ pebbles tabla/6, ~ sitar/2]") 12
+  ~~ speed "2.2"
+  ~~ pan "[0.5, 1]"
+
+d3 $ (sound $ slow 2 "[drum sn/2] [drum drum sn/1] [drum sn/4] [drum [drum drum] sn/1]")
+  ~~ speed "[1 1.2 1]"
+  ~~ vowel "[o e, i]"
+
+d4 $ sound "wobble [~ wobble] ~"
+  ~~ speed (every 4 (fmap (+1)) "2 2")
+
+d5 $ sound (every 4 ((\x -> sample x 2) <$>) "bd sn [bd bd h bd] sn")
+  ~~ end "0.1 0.3 1"
+  ~~ speed "1.5"

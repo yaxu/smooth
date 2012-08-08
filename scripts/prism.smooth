@@ -1,0 +1,35 @@
+
+{- 7/4 quick quick slow -}
+
+{- Polyrhythmic house -}
+
+{- Texture -}
+
+{- Gabba -}
+
+d1 $ sound "bd [hc kurt hc kurt/2] bd/2 [hc [hc hc]]"
+  ~~ end "0.01"
+  ~~ speed "0.7"
+  ~~ pan "1"
+
+d2 $ sound "~ bd [hc kurt hc kurt/2] [hc [hc hc]]"
+  ~~ end "0.02"
+  ~~ speed "0.7"
+  ~~ pan "0"
+  ~~ vowel "o"
+
+d3 $ (sound $ combine ["bd ~ sn/4 ~ ~ bd sn/2 ~", density 6 "hh bd"])
+  ~~ end "0.1"
+
+d1 silence
+
+d4 $ slow 1 $ striate (sound "sheffield") 64
+  ~~ speed "2"
+
+d1 silence
+
+d1 $ sound "[bd ~] [sn sn] [sn [bd bd bd bd] sn]"
+  ~~ pan (sinewave1)
+  ~~ vowel "[a e]"
+
+d1 silence

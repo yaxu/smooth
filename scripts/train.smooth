@@ -1,0 +1,4 @@
+d1 $ sound "[bd [bd bd bd]] [sn/1 [sn/2 drum/2 bd] sn/2]"
+  ~~ pan sinewave1
+  ~~ vowel "a e"
+d1 silence
