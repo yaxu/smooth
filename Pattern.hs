@@ -23,15 +23,24 @@ joinPattern = mapAtom (\(Atom x) -> x)
 
 instance Applicative Pattern where
   pure = Atom
+ 
+  -- Pattern (a -> b) <*> Pattern a -> Pattern b
 
-  (Cycle fs) <*> xs = Cycle $ map (<*> xs) fs
-  fs <*> (Cycle xs) = Cycle $ map (fs <*>) xs
+  -- Apply a pattern to every pattern of functions in a cycle
+  (Cycle fs) <*> x = Cycle $ map (<*> x) fs
   
+  -- Apply every subpattern in a cycle to a pattern of functions
+  f <*> (Cycle xs) = Cycle $ map (f <*>) xs
+  cd 07976
+  -- Apply every value inside a pattern to a function
   Atom f <*> xs = f <$> xs
+  
+  -- Apply a value to every function inside a pattern
   fs <*> (Atom x) = (\f -> f x) <$> fs
 
+  -- Simple case of two unit arcs
   fs@(Arc {reps = 1}) <*> xs@(Arc {reps = 1}) = down
-     where down | isIn fs xs = fs {pattern = (pattern fs) <*> (pattern xs)}
+     where down | startsIn fs xs = fs {pattern = (pattern fs) <*> (pattern xs)}
                 | otherwise = Silence
 
   fs@(Arc {}) <*> xs@(Arc {}) = Composition f
@@ -79,11 +88,12 @@ instance Monad Pattern where
 
     --where s n = mapAtom (\x -> mapAtom (\f -> Atom $ (event f) (event x)) (at fs n)) xs
 
-isIn :: Pattern a -> Pattern b -> Bool
-isIn (Arc {onset = o1}) (Arc {onset = o2, scale = s})
+-- does a start within b?
+startsIn :: Pattern a -> Pattern b -> Bool
+startsIn (Arc {onset = o1}) (Arc {onset = o2, scale = s})
   = (o1 >= o2 && o1 < (o2 + s)) 
     -- || (r2 == 0 && o1 == o2)
-isIn _ _ = False
+startsIn _ _ = False
 
 instance Functor Pattern where
   fmap f p@(Atom {event = a}) = p {event = f a}
@@ -96,7 +106,7 @@ instance Functor Pattern where
 
 instance (Show a) => Show (Pattern a) where
   show (Atom e) = show e
-  show (Arc p o d r) = concat [" [", show p, "@(", show o, ")x(", show d, ")-(", show r, ")]"]
+  show (Arc p o s r) = concat [" [", show p, "@(", show o, ")x(", show s, ")-(", show r, ")]"]
   show (Cycle ps) = " (" ++ (intercalate ", " (map show ps)) ++ ") "
   show (Composition _) = "*composition*"
   show (Signal s) = "*signal*"
@@ -341,6 +351,8 @@ flat' r p = mapFsts (\(x,y) -> fromRational $ (x - (fst r)) / (snd r - fst r)) (
 slow :: Rational -> Pattern a -> Pattern a
 slow x p = Arc p 0 x (1/x)
 
+density x p = slow (1/x) p
+
 unit :: Pattern a -> Bool
 unit p = reps p == (1 / scale p)
 
@@ -349,8 +361,6 @@ flatten (x, y) p = Cycle $ map (\(o, s, e) -> (Arc (Atom e) o s 1)) xs
   where xs = map norm $ flat (x,y) p
         norm ((x', y'), e) = ((x' - x) / d, (y' - x')/d, e)
         d = y - x
-
-
 
 --squash :: Rational -> Rational -> [(Rational, a)] -> [(Rational, a)]
 --squash o s es = mapFsts ((+ o) . (* s)) es
