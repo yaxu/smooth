@@ -26,7 +26,7 @@ dirt = OscShape {path = "/play",
 --channels = 4
 --x = Map.insert (params dirt !! 0) (Just $ String "chin/0") $ defaultMap dirt
 --x' pan = Map.insert (params dirt !! 4) (Just $ Float pan) $ x
---c = Cycle $ map (\i -> (Arc (Atom $ x' (channels * (fromIntegral i / fromIntegral steps))) (fromIntegral i / fromIntegral steps) 0)) [0 .. (steps - 1)]
+--c = Cycle $ map (\i -> (Arc (atom $ x' (channels * (fromIntegral i / fromIntegral steps))) (fromIntegral i / fromIntegral steps) 0)) [0 .. (steps - 1)]
 
 dirtstream name = stream "127.0.0.1" "127.0.0.1" name "127.0.0.1" 7771 dirt
 
@@ -44,9 +44,9 @@ sample name n = name ++ "/" ++ (show n)
 
 striate :: OscPattern -> Int -> OscPattern
 striate p n = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
-  where off i p = p ~~ begin (Atom (fromIntegral i / fromIntegral n)) ~~ end (Atom (fromIntegral (i+1) / fromIntegral n))
+  where off i p = p ~~ begin (atom (fromIntegral i / fromIntegral n)) ~~ end (atom (fromIntegral (i+1) / fromIntegral n))
         
 striateO :: OscPattern -> Int -> Double -> OscPattern
 striateO p n o = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
-  where off i p = p ~~ begin (Atom $ (fromIntegral i / fromIntegral n) + o) ~~ end (Atom $ (fromIntegral (i+1) / fromIntegral n) + o)
+  where off i p = p ~~ begin (atom $ (fromIntegral i / fromIntegral n) + o) ~~ end (atom $ (fromIntegral (i+1) / fromIntegral n) + o)
 
