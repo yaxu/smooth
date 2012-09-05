@@ -83,10 +83,10 @@ pRhythm f = do spaces
                pSequence f
 
 pSequence :: Parser (Pattern a) -> GenParser Char () (Pattern a)
-pSequence f = do x <-pReps
+pSequence f = do --x <-pReps
                  ps <- many $ pPart f
-                 let p = Arc (cat ps) 0 1 x
-                 return $ p
+                 --let p = Arc (cat ps) 0 1 x
+                 return $ cat ps
 
 pPart :: Parser (Pattern a) -> Parser (Pattern a)
 pPart f = do part <- parens (pSequence f) <|> f <|> pPoly f
@@ -102,23 +102,23 @@ pString = many1 (letter <|> oneOf "0123456789" <|> char '/') <?> "string"
 
 pVocable :: Parser (Pattern String)
 pVocable = do v <- pString
-              return $ Atom v
+              return $ atom v
 
 pDouble :: Parser (Pattern Double)
 pDouble = do nf <- intOrFloat <?> "float"
              let f = either fromIntegral id nf
-             return $ Atom f
+             return $ atom f
 
 pBool :: Parser (Pattern Bool)
 pBool = do oneOf "t1"
-           return $ Atom True
+           return $ atom True
         <|>
         do oneOf "f0"
-           return $ Atom False
+           return $ atom False
 
 pInt :: Parser (Pattern Int)
 pInt = do i <- natural <?> "integer"
-          return $ Atom (fromIntegral i)
+          return $ atom (fromIntegral i)
 
 pRatio :: Parser (Rational)
 pRatio = do n <- natural <?> "numerator"

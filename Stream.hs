@@ -106,14 +106,14 @@ stream client server name address port shape
 onTick :: UDP -> OscShape -> MVar (OscPattern) -> BpsChange -> Int -> IO ()
 onTick s shape patternM change ticks
   = do p <- readMVar patternM
-       let tpb' = 4 :: Integer
+       let tpb' = 2 :: Integer
            ticks' = (fromIntegral ticks) :: Integer
            a = ticks' % tpb'
            --a = (ticks' `mod` tpb') % tpb'
-           b = (ticks' + 1) % tpb'
+           b = 1 % tpb'
            messages = mapMaybe 
                       (toMessage shape change ticks) 
-                      (flat' (a,b) p)
+                      (patToRelOnsets (a,b) p)
        --putStrLn $ (show a) ++ ", " ++ (show b)
        --putStrLn $ "tick " ++ show ticks ++ " = " ++ show messages
        catch (mapM_ (send s) messages) (\msg -> putStrLn $ "oops " ++ show msg)
@@ -134,7 +134,7 @@ param :: OscShape -> String -> Param
 param shape n = head $ filter (\x -> name x == n) (params shape)
 
 merge :: OscPattern -> OscPattern -> OscPattern
-merge x y = Map.union <$> x <*> y
+merge x y = Map.union <$> y <*> x
 
 infixr 1 ~~
 (~~) = merge
