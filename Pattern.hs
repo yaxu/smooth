@@ -7,17 +7,15 @@ import Data.Maybe
 import Data.Ratio
 import Debug.Trace
 
-type T = Rational
-type Range = (T, T)
+type Range = (Rational, Rational)
 type Event a = (Range, a)
 
---data Seq a = Seq {events :: [Event a]}
-
 data Pattern a = Pattern {arc :: Range -> [Event a]}
-               | Signal {at :: T -> [a]}
+               | Signal {at :: Rational -> [a]}
 
---instance (Show a) => Show (Seq a) where
---  show (Seq es) = show es
+instance (Show a) => Show (Pattern a) where
+  show p@(Pattern _) = show $ arc p (0,1)
+  show p@(Signal _) = "~signal~"
 
 silence = Pattern $ const $ []
 
@@ -31,37 +29,26 @@ instance Functor Pattern where
   fmap f (Pattern a) = Pattern $ \r -> fmap (mapSnd f) $ a r
   fmap f (Signal a) = Signal $ \t -> fmap f (a t)
 
---instance Applicative Seq where
---  pure x = Seq [((0,1), x)]
---  (Seq fs) <*> (Seq xs) = Seq xs'
---    where xs' = concatMap (\f -> map (\(t, x) -> (t, (snd f) x)) $ filter (startsIn f) xs) fs
-
---startsIn :: Event a -> Event b -> Bool
---startsIn (t, _) (t', _) = (fst t') >= (fst t) && (fst t' <= (fst t + snd t))
-
 instance Applicative Pattern where
   pure x = Signal $ const [x]
   (Pattern fs) <*> (Pattern xs) = 
-    Pattern $ \r -> concatMap 
-                    (\(t, f) -> map
-                                (mapSnd f)
-                                (filter (\(t', _) -> t == t') (xs r))
+    Pattern $ \r -> concatMap
+                    (\((o,d),x) -> map
+                                   (\(r', f) -> (r', f x))
+                                   (
+                                     filter
+                                     (\((o',d'),_) -> (o' >= o) && (o' < (o+d)))
+                                     (fs r)
+                                   )
                     )
-                    (fs r)
-  
+                    (xs r)
   (Signal fs) <*> (Signal xs) = Signal $ \t -> (fs t) <*> (xs t)
-  
   (Signal fs) <*> (Pattern xs) = 
     Signal $ \t -> concatMap (\(_, x) -> map (\f -> f x) (fs t)) (xs (t,0))
---  Pattern $ \r -> concatMap (\(t, x) -> map (\f -> (t, f x)) (fs t)) (xs r)
-
   (Pattern fs) <*> (Signal xs) = 
     Pattern $ \r -> concatMap (\((o,d), f) -> map (\x -> ((o,d), f x)) (xs o)) (fs r)
 
-{-
-rep :: a -> Pattern a
-rep x = Pattern $ \(s, d) -> Seq (map (\n -> ((fromIntegral n, 1), x)) [(ceiling s) .. (ceiling $ s+d) - 1])
--}
+
 
 flatten :: (Rational, Rational) -> [Pattern a] -> [Event a]
 flatten t ((Signal _):ps) = flatten t ps -- ignore signals
@@ -84,13 +71,78 @@ flatten (start, d) ps | d <= 0 = []
                                segD
                                )
 
---        info = "\n" ++ concatMap (\(a, b) -> a ++ ": " ++ show b) things
+--        info = "\n" ++ concatMap (\(a, b) -> a ++ ": " ++ show b) thingsp
 --        things = [("start", start), (" d", d), (" segStart", segStart), (" segD", segD)]
 
 -- ignores signals - should return a signal if any are signals?  via a fold..
 cat :: [Pattern a] -> Pattern a
 cat [] = silence
 cat ps = Pattern $ \r -> flatten r ps
+
+--catten :: [Pattern a] -> Pattern a
+--catten ps = \r -> concatMap (squash r l) (zip [0..] ps)
+--  where l = length ps
+{-
+squash :: Range -> Int -> (Int, Pattern a) -> [Event a]
+squash r l (n, p) = concatMap ((arc p) . zoomIn) rs
+  where rs = map (\i -> (i, ranges r (fromIntegral l) i)) (take n [0 ..])
+        zoomIn (i, (o, d)) = (o*i,d*i)
+        zoomOut (i, (o, d)) = (o/i,d/i)
+-}
+
+
+catten :: [Pattern a] -> Pattern a
+catten ps = combine $ map (squash l) (zip [0..] ps)
+  where l = length ps
+
+
+
+squash :: Int -> (Int, Pattern a) -> Pattern a
+squash n (i, p) = Pattern $ \r -> concatMap doBit (bits r)
+  where o' = (fromIntegral i)%(fromIntegral n)
+        d' = 1%(fromIntegral n)
+        subR :: Rational -> Range
+        cycle o = (fromIntegral $ floor o)
+        subR o = ((cycle o) + o', d')
+        doBit (o,d) = mapFsts scaleOut $ maybe [] ((arc p) . scaleIn) (subRange (o,d) (subR o))
+        scaleIn :: Range -> Range
+        scaleIn (o,d) = (o-o',d* (fromIntegral n))
+        scaleOut :: Range -> Range
+        scaleOut (o,d) = ((cycle o)+o'+ ((o-(cycle o))/(fromIntegral n)), d / (fromIntegral n))
+
+subRange :: Range -> Range -> Maybe Range
+subRange (o,d) (o',d') | d'' > 0 = Just (o'', d'')
+                       | otherwise = Nothing
+  where o'' = max o (o')
+        d'' = (min (o+d) (o'+d')) - o''
+
+--squash n (i, p) = Pattern $ \r -> maybe [] ((arc p) . (rangeIn subR))
+--  where subR = (i'%n', 1%n')
+--        i' = fromIntegral i
+--        n' = fromIntegral n
+        --squashTime (o,d) = (o,d*)
+
+
+{-
+rangeIn :: Range -> Range -> Range
+rangeIn (o,d) (o',d') = (o'', d'')
+  where o'' = (fromIntegral $ floor o) + ((o' - o) / d)
+        d'' = d' / d
+
+subRange :: Range -> Range -> Maybe Range
+subRange (o,d) (o',d') | d'' > 0 = Just (o'', d'')
+                       | otherwise = Nothing
+  where o'' = max o (cycle+o')
+        d'' = (min (o+d) (cycle+o'+d')) - o''
+        cycle = fromIntegral $ floor o
+
+-}
+
+-- chop range into ranges of unit cycles
+bits :: Range -> [Range]
+bits (_, 0) = []
+bits (o, d) = (o,d'):bits (o+d',d-d')
+  where d' = min ((fromIntegral $ (floor o) + 1) - o) d
 
 -- What about signals?
 combine :: [Pattern a] -> Pattern a
@@ -159,3 +211,6 @@ mapSnd f (x,y) = (x,f y)
 
 mapSnds :: (a -> b) -> [(c, a)] -> [(c, b)]
 mapSnds = fmap . mapSnd
+
+sinewave :: Pattern Double
+sinewave = Signal $ \t -> [(sin . (pi * 2 *)) (fromRational t)]
