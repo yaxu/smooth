@@ -19,8 +19,9 @@ instance (Show a) => Show (Pattern a) where
 
 silence = Pattern $ const $ []
 
+-- TODO adjust for overlaps..
 atom :: a -> Pattern a
-atom x = Pattern $ \(s, d) -> map (\t -> ((fromIntegral t, fromIntegral t + 1), x)) [floor s .. (floor (s + d)) - 1]
+atom x = Pattern $ \(s, d) -> map (\t -> ((fromIntegral t, fromIntegral 1), x)) [floor s .. (ceiling (s + d)) - 1]
 
 --instance Functor Seq where
 --  fmap f = Seq . mapSnds f . events
@@ -49,53 +50,9 @@ instance Applicative Pattern where
     Pattern $ \r -> concatMap (\((o,d), f) -> map (\x -> ((o,d), f x)) (xs o)) (fs r)
 
 
-
-flatten :: (Rational, Rational) -> [Pattern a] -> [Event a]
-flatten t ((Signal _):ps) = flatten t ps -- ignore signals
-flatten (start, d) ps | d <= 0 = []
-                      | otherwise =
-  es ++ (flatten (segStop, d-(segStop-start)) ps)
-  where l = length ps
-        loopStart = (floor start) % 1
-        segStart = fromIntegral (floor $ start * (fromIntegral l)) % (fromIntegral l)
-        segD = 1 % (fromIntegral l)
-        segStop = segStart + segD :: Rational
-        patTime t = loopStart + ((t - segStart) * (fromIntegral l))
-        patStart = patTime start
-        patStop = min (patTime (start + d)) (loopStart + 1)
-        patD = patStop - patStart
-        patN = mod (floor $ start * (fromIntegral l)) l
-        p = ps !! patN
-        es = mapFsts scale $ (arc p) (patStart, patD)
-        scale (sStart, sD)  = (((sStart - loopStart) * segD) + segStart,
-                               segD
-                               )
-
---        info = "\n" ++ concatMap (\(a, b) -> a ++ ": " ++ show b) thingsp
---        things = [("start", start), (" d", d), (" segStart", segStart), (" segD", segD)]
-
--- ignores signals - should return a signal if any are signals?  via a fold..
 cat :: [Pattern a] -> Pattern a
-cat [] = silence
-cat ps = Pattern $ \r -> flatten r ps
-
---catten :: [Pattern a] -> Pattern a
---catten ps = \r -> concatMap (squash r l) (zip [0..] ps)
---  where l = length ps
-{-
-squash :: Range -> Int -> (Int, Pattern a) -> [Event a]
-squash r l (n, p) = concatMap ((arc p) . zoomIn) rs
-  where rs = map (\i -> (i, ranges r (fromIntegral l) i)) (take n [0 ..])
-        zoomIn (i, (o, d)) = (o*i,d*i)
-        zoomOut (i, (o, d)) = (o/i,d/i)
--}
-
-
-catten :: [Pattern a] -> Pattern a
-catten ps = combine $ map (squash l) (zip [0..] ps)
+cat ps = combine $ map (squash l) (zip [0..] ps)
   where l = length ps
-
-
 
 squash :: Int -> (Int, Pattern a) -> Pattern a
 squash n (i, p) = Pattern $ \r -> concatMap doBit (bits r)
@@ -108,7 +65,7 @@ squash n (i, p) = Pattern $ \r -> concatMap doBit (bits r)
         scaleIn :: Range -> Range
         scaleIn (o,d) = (o-o',d* (fromIntegral n))
         scaleOut :: Range -> Range
-        scaleOut (o,d) = ((cycle o)+o'+ ((o-(cycle o))/(fromIntegral n)), d / (fromIntegral n))
+        scaleOut (o,d) = ((cycle o)+o'+ ((o-(cycle o))/(fromIntegral n)), d/ (fromIntegral n))
 
 subRange :: Range -> Range -> Maybe Range
 subRange (o,d) (o',d') | d'' > 0 = Just (o'', d'')
@@ -157,8 +114,7 @@ filterEvents f (Pattern a) = Pattern $ \r -> filter f $ a r
 
 -- Filter out events that start before range
 filterOffsets :: Pattern a -> Pattern a
-filterOffsets p@(Signal _) = p
-filterOffsets p@(Pattern _) = filterEvents ((>= 0) . fst . fst) p
+filterOffsets (Pattern a) = Pattern $ \r -> filter ((>= (fst r)). fst . fst) $ a r
 
 patToRelOnsets :: Range -> Pattern a -> [(Double, a)]
 patToRelOnsets _ (Signal _) = []
