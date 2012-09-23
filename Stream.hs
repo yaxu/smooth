@@ -34,7 +34,6 @@ data OscShape = OscShape {path :: String,
 type OscMap = Map.Map Param (Maybe Datum)
 type OscPattern = Pattern OscMap
 
-
 defaultDatum :: Param -> Maybe Datum
 defaultDatum (S _ (Just x)) = Just $ String x
 defaultDatum (I _ (Just x)) = Just $ Int x
@@ -46,7 +45,6 @@ hasDefault (S _ Nothing) = False
 hasDefault (I _ Nothing) = False
 hasDefault (F _ Nothing) = False
 hasDefault _ = True
-
 
 defaulted :: OscShape -> [Param]
 defaulted = filter hasDefault . params
@@ -113,7 +111,7 @@ onTick s shape patternM change ticks
            b = 1 % tpb'
            messages = mapMaybe 
                       (toMessage shape change ticks) 
-                      (patToRelOnsets (a,b) p)
+                      (patToRelOnsets (a, Just b) p)
        --putStrLn $ (show a) ++ ", " ++ (show b)
        --putStrLn $ "tick " ++ show ticks ++ " = " ++ show messages
        catch (mapM_ (send s) messages) (\msg -> putStrLn $ "oops " ++ show msg)
@@ -134,7 +132,7 @@ param :: OscShape -> String -> Param
 param shape n = head $ filter (\x -> name x == n) (params shape)
 
 merge :: OscPattern -> OscPattern -> OscPattern
-merge x y = Map.union <$> y <*> x
+merge x y = Map.union <$> x <*> y
 
 infixr 1 ~~
 (~~) = merge

@@ -10,20 +10,21 @@ import Debug.Trace
 type Range = (Rational, Rational)
 type Event a = (Range, a)
 
-data Pattern a = Sequence {arc :: Range -> [Event a]}
+data Pattern a = Sequence {arc :: (Rational, Maybe Rational) -> [Event a]}
                | Signal {at :: Rational -> [a]}
 
 instance (Show a) => Show (Pattern a) where
-  show p@(Sequence _) = show $ arc p (0,1)
+  show p@(Sequence _) = show $ arc p (0, Just 1)
   show p@(Signal _) = "~signal~"
 
 silence = Sequence $ const []
 
 atom :: a -> Pattern a
 atom x = Sequence f
-  where f (s, d) = map 
-                   (\t -> ((fromIntegral t, 1), x)) 
-                   [floor s .. (ceiling (s + d)) - 1]
+  where f (s, Nothing) = [((fromIntegral (floor s), 1), x)]
+        f (s, Just d) = map 
+                        (\t -> ((fromIntegral t, 1), x)) 
+                        [floor s .. (ceiling (s + d)) - 1]
 
 instance Functor Pattern where
   fmap f (Sequence a) = Sequence $  fmap (fmap (mapSnd f)) a
@@ -44,50 +45,71 @@ instance Applicative Pattern where
                      (xs r)
   (Signal fs) <*> (Signal xs) = Signal $ \t -> (fs t) <*> (xs t)
   (Signal fs) <*> px@(Sequence _) = 
-    Signal $ \t -> concatMap (\(_, x) -> map (\f -> f x) (fs t)) (at' px t)
+    Signal $ \t -> concatMap (\(_, x) -> map (\f -> f x) (fs t)) (arc px (t,Nothing))
   (Sequence fs) <*> (Signal xs) = 
     Sequence $ \r -> concatMap (\((o,d), f) -> 
                                 map (\x -> ((o,d), f x)) (xs o)) (fs r)
 
--- Strange hack - have to sample the discrete pattern to get the signal..
+{-
 at' :: Pattern a -> Rational -> [Event a]
-at' p@(Sequence _) t = filter (\((t', _), _) -> t >= t') $ arc p (t, 1%128)
+at' p@(Sequence _) t = filter (\((t', _), _) -> t >= t') $ arc p (t, Nothing)
 at' p@(Signal _) t = undefined
+-}
 
 cat :: [Pattern a] -> Pattern a
 cat ps = combine $ map (squash l) (zip [0..] ps)
   where l = length ps
 
+tr x = trace (show x) x
+
 squash :: Int -> (Int, Pattern a) -> Pattern a
-squash n (i, p) = Sequence $ \r -> concatMap doBit (bits r)
+squash n (i, p@(Sequence _)) = Sequence $ \r -> concatMap doBit (bits r)
   where o' = (fromIntegral i)%(fromIntegral n)
         d' = 1%(fromIntegral n)
-        subR :: Rational -> Range
-        cycle o = (fromIntegral $ floor o)
-        subR o = ((cycle o) + o', d')
+        subR o = ((cyc o) + o', d')
         doBit (o,d) = mapFsts scaleOut $ maybe [] ((arc p) . scaleIn) (subRange (o,d) (subR o))
-        scaleIn :: Range -> Range
-        scaleIn (o,d) = (o-o',d* (fromIntegral n))
-        scaleOut :: Range -> Range
-        scaleOut (o,d) = ((cycle o)+o'+ ((o-(cycle o))/(fromIntegral n)), d/ (fromIntegral n))
+        -- scaleIn (o,d) = (o-o',d* (fromIntegral n))
+        scaleIn (o, Just d) = ((cyc o)+((o-(cyc o)-o')*(fromIntegral n)), Just (d*(fromIntegral n)))
+        scaleIn (o, Nothing) = ((cyc o)+((o-(cyc o)-o')*(fromIntegral n)), Nothing)
+        scaleOut (o,d) = ((cyc o)+o'+((o-(cyc o))/(fromIntegral n)), d/(fromIntegral n))
 
-subRange :: Range -> Range -> Maybe Range
-subRange (o,d) (o',d') | d'' > 0 = Just (o'', d'')
-                       | otherwise = Nothing
+squash n (i, p@(Signal _)) = Signal $ f
+  where f t | (t - cyc t) >= t' && (t - cyc t) < (t'+d') = (at p) $ scaleIn t
+            | otherwise = []
+        t' = (fromIntegral i)%(fromIntegral n)
+        d' = 1%(fromIntegral n)
+        scaleIn t  = (cyc t)+((t-(cyc t)-t')*(fromIntegral n))
+
+cyc = fromIntegral . floor
+
+subRange :: (Rational, Maybe Rational) -> Range -> Maybe (Rational, Maybe Rational)
+subRange (o, Just d) (o',d') | d'' > 0 = Just (o'', Just d'')
+                             | otherwise = Nothing
   where o'' = max o (o')
         d'' = (min (o+d) (o'+d')) - o''
+subRange (o, Nothing) (o',d') | o >= o' && o < (o' + d') = Just (o, Nothing)
+                              | otherwise = Nothing
 
 -- chop range into ranges of unit cycles
-bits :: Range -> [Range]
-bits (_, 0) = []
-bits (o, d) = (o,d'):bits (o+d',d-d')
+bits :: (Rational, Maybe Rational) -> [(Rational, Maybe Rational)]
+bits r@(_, Nothing) = [r]
+bits (_, Just 0) = []
+bits (o, Just d) = (o, Just d'):bits (o+d',Just (d-d'))
   where d' = min ((fromIntegral $ (floor o) + 1) - o) d
 
--- What about signals?
-combine :: [Pattern a] -> Pattern a
-combine ps = Sequence $ \r -> concatMap (\p -> (arc p) r) ps
+--combine :: [Pattern a] -> Pattern a
+--combine ps = Sequence $ \r -> concatMap (\p -> (foo p) r) ps
 
-patToOnsets :: Range -> Pattern a -> [Event a]
+combine :: [Pattern a] -> Pattern a
+combine ps = foldr f silence ps
+  where f (Sequence a) (Sequence b) = Sequence $ \r -> (a r) ++ (b r)
+        f (Signal a) (Sequence b) = Signal $ \t -> (a t) ++ (map snd $ b (t, Nothing))
+        f a b = f b a
+
+foo (Sequence a)  = a
+foo _ = error "oops"
+
+patToOnsets :: (Rational, Maybe Rational) -> Pattern a -> [Event a]
 patToOnsets _ (Signal _) = [] --map (\x -> (t, x)) (a t)
 patToOnsets r (Sequence a) = a r
 
@@ -98,9 +120,10 @@ filterEvents f (Sequence a) = Sequence $ \r -> filter f $ a r
 filterOffsets :: Pattern a -> Pattern a
 filterOffsets (Sequence a) = Sequence $ \r -> filter ((>= (fst r)). fst . fst) $ a r
 
-patToRelOnsets :: Range -> Pattern a -> [(Double, a)]
+patToRelOnsets :: (Rational, Maybe Rational) -> Pattern a -> [(Double, a)]
 patToRelOnsets _ (Signal _) = []
-patToRelOnsets (s, d) p = mapFsts (fromRational . (/ d) . (subtract s) . fst) $ patToOnsets (s, d) (filterOffsets p)
+patToRelOnsets (s, Just d) p = mapFsts (fromRational . (/ d) . (subtract s) . fst) $ patToOnsets (s, Just d) (filterOffsets p)
+patToRelOnsets (s, Nothing) _ = []
 
 mapEvents :: (Event a -> Event a) -> Pattern a -> Pattern a
 mapEvents f (Sequence a) = Sequence $ \r -> map f (a r)
@@ -119,7 +142,9 @@ mapOnset f (Sequence a) = Sequence $ \(s, d) -> a (f s, d)
 
 -- Function applied to both onset (start) and offset (start plus duration)
 mapRange :: (Rational -> Rational) -> Pattern a -> Pattern a
-mapRange f p@(Sequence a) = Sequence $ \(s, d) -> a (f s, (f (s + d)) - (f s))
+mapRange f p@(Sequence a) = Sequence a'
+  where a' (s, Just d) = a (f s, Just $ (f (s + d)) - (f s))
+        a' (s, Nothing) = a (f s, Nothing)
 mapRange f p = mapOnset f p
 
 (<~) :: Rational -> Pattern a -> Pattern a
