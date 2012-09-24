@@ -97,9 +97,6 @@ bits (_, Just 0) = []
 bits (o, Just d) = (o, Just d'):bits (o+d',Just (d-d'))
   where d' = min ((fromIntegral $ (floor o) + 1) - o) d
 
---combine :: [Pattern a] -> Pattern a
---combine ps = Sequence $ \r -> concatMap (\p -> (foo p) r) ps
-
 combine :: [Pattern a] -> Pattern a
 combine ps = foldr f silence ps
   where f (Sequence a) (Sequence b) = Sequence $ \r -> (a r) ++ (b r)
