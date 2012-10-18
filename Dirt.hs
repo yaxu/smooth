@@ -16,7 +16,10 @@ dirt = OscShape {path = "/play",
                             F "speed" (Just 1),
                             F "pan" (Just 0.5),
                             F "velocity" (Just 0),
-                            S "vowel" (Just "")
+                            S "vowel" (Just ""),
+                            F "cutoff" (Just 0),
+                            F "resonance" (Just 0),
+                            F "accellerate" (Just 0)
                           ],
                  timestamp = True
                 }
@@ -38,6 +41,9 @@ speed        = makeF dirt "speed"
 pan          = makeF dirt "pan"
 velocity     = makeF dirt "velocity"
 vowel        = makeS dirt "vowel"
+cutoff       = makeF dirt "cutoff"
+resonance    = makeF dirt "resonance"
+accellerate  = makeF dirt "accellerate"
 
 sample :: String -> Int -> String
 sample name n = name ++ "/" ++ (show n)

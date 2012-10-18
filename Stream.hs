@@ -77,7 +77,8 @@ toMessage s change ticks (o, m) =
          usec = floor $ 1000000 * (logicalOnset - (fromIntegral sec))
          oscdata = catMaybes $ mapMaybe (\x -> Map.lookup x m') (params s)
          oscdata' = ((Int sec):(Int usec):oscdata)
-         osc = Message (path s) oscdata'
+         osc | timestamp s = Message (path s) oscdata'
+             | otherwise = Bundle (UTCr logicalOnset) [Message (path s) oscdata]
      return osc
 
 
@@ -116,7 +117,6 @@ onTick s shape patternM change ticks
        --putStrLn $ "tick " ++ show ticks ++ " = " ++ show messages
        catch (mapM_ (send s) messages) (\msg -> putStrLn $ "oops " ++ show msg)
        return ()
-
 
 make :: (a -> Datum) -> OscShape -> String -> Pattern a -> OscPattern
 make toOsc s nm p = fmap (\x -> Map.singleton nParam (defaultV x)) p
