@@ -1,3 +1,5 @@
+{-# LANGUAGE NoMonomorphismRestriction #-}
+  
 module Dirt where
 
 import Stream
@@ -48,11 +50,11 @@ accellerate  = makeF dirt "accellerate"
 sample :: String -> Int -> String
 sample name n = name ++ "/" ++ (show n)
 
-striate :: OscPattern -> Int -> OscPattern
+striate :: OscSequence -> Int -> OscSequence
 striate p n = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
-  where off i p = p ~~ begin (atom (fromIntegral i / fromIntegral n)) ~~ end (atom (fromIntegral (i+1) / fromIntegral n))
+  where off i p = p ~~ begin (atom (fromIntegral i / fromIntegral n) :: Sequence Double) ~~ end (atom (fromIntegral (i+1) / fromIntegral n) :: Sequence Double)
         
-striateO :: OscPattern -> Int -> Double -> OscPattern
+striateO :: OscSequence -> Int -> Double -> OscSequence
 striateO p n o = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
-  where off i p = p ~~ begin (atom $ (fromIntegral i / fromIntegral n) + o) ~~ end (atom $ (fromIntegral (i+1) / fromIntegral n) + o)
+  where off i p = p ~~ begin ((atom $ (fromIntegral i / fromIntegral n) + o) :: Sequence Double) ~~ end ((atom $ (fromIntegral (i+1) / fromIntegral n) + o) :: Sequence Double)
 

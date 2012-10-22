@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances, RankNTypes #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances, RankNTypes, NoMonomorphismRestriction #-}
 
 module Stream where
 
@@ -13,7 +13,6 @@ import Data.Ratio
 --import Control.Exception
 
 import qualified Data.Map as Map
-
 
 data Param = S {name :: String, sDefault :: Maybe String}
            | F {name :: String, fDefault :: Maybe Double}
@@ -32,7 +31,8 @@ data OscShape = OscShape {path :: String,
                           timestamp :: Bool
                          }
 type OscMap = Map.Map Param (Maybe Datum)
-type OscPattern = Pattern OscMap
+
+type OscSequence = Sequence OscMap
 
 defaultDatum :: Param -> Maybe Datum
 defaultDatum (S _ (Just x)) = Just $ String x
@@ -86,7 +86,7 @@ applyShape' :: OscShape -> OscMap -> Maybe OscMap
 applyShape' s m | hasRequired s m = Just $ Map.union m (defaultMap s)
                 | otherwise = Nothing
 
-start :: String -> String -> String -> String -> Int -> OscShape -> IO (MVar OscPattern)
+start :: String -> String -> String -> String -> Int -> OscShape -> IO (MVar (OscSequence))
 start client server name address port shape
   = do patternM <- newMVar silence
        putStrLn $ "connecting " ++ (show address) ++ ":" ++ (show port)
@@ -96,13 +96,13 @@ start client server name address port shape
        forkIO $ clocked name client server 1 ot
        return patternM
 
-stream :: String -> String -> String -> String -> Int -> OscShape -> IO (OscPattern -> IO ())
+stream :: String -> String -> String -> String -> Int -> OscShape -> IO (OscSequence -> IO ())
 stream client server name address port shape 
   = do patternM <- start client server name address port shape
        return $ \p -> do swapMVar patternM p
                          return ()
 
-onTick :: UDP -> OscShape -> MVar (OscPattern) -> BpsChange -> Int -> IO ()
+onTick :: UDP -> OscShape -> MVar (OscSequence) -> BpsChange -> Int -> IO ()
 onTick s shape patternM change ticks
   = do p <- readMVar patternM
        let tpb' = 2 :: Integer
@@ -112,13 +112,13 @@ onTick s shape patternM change ticks
            b = 1 % tpb'
            messages = mapMaybe 
                       (toMessage shape change ticks) 
-                      (patToRelOnsets (a, Just b) p)
+                      (seqToRelOnsets (a, Just b) p)
        --putStrLn $ (show a) ++ ", " ++ (show b)
        --putStrLn $ "tick " ++ show ticks ++ " = " ++ show messages
        catch (mapM_ (send s) messages) (\msg -> putStrLn $ "oops " ++ show msg)
        return ()
 
-make :: (a -> Datum) -> OscShape -> String -> Pattern a -> OscPattern
+make :: Pattern p => (a -> Datum) -> OscShape -> String -> p a -> (p OscMap)
 make toOsc s nm p = fmap (\x -> Map.singleton nParam (defaultV x)) p
   where nParam = param s nm
         defaultV a = Just $ toOsc a
@@ -130,9 +130,9 @@ makeI = make Int
 
 param :: OscShape -> String -> Param
 param shape n = head $ filter (\x -> name x == n) (params shape)
-
-merge :: OscPattern -> OscPattern -> OscPattern
-merge x y = Map.union <$> x <*> y
+                
+merge :: Pattern p => OscSequence -> p OscMap -> OscSequence
+merge x y = (Map.union <$> x) <~> (toSignal y)
 
 infixr 1 ~~
 (~~) = merge
