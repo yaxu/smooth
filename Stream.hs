@@ -131,8 +131,9 @@ makeI = make Int
 param :: OscShape -> String -> Param
 param shape n = head $ filter (\x -> name x == n) (params shape)
                 
+-- Merge any pattern with a sequence
 merge :: Pattern p => OscSequence -> p OscMap -> OscSequence
-merge x y = (Map.union <$> x) <~> (toSignal y)
+merge x y = Map.union <$> x <~> y
 
 infixr 1 ~~
 (~~) = merge

@@ -71,6 +71,17 @@ instance Pattern Sequence where
   mapTimeOut f p = mapEvents (mapFst f') p
     where f' (s, d) = (f s, (f (s + d)) - (f s))
 
+-- Normalise range to positive duration
+normaliseRange :: Range -> Range
+normaliseRange r@(_, Nothing) = r
+normaliseRange r@(s, Just d) | d < 0 = (s + d, Just $ 0 - d)
+                             | otherwise = r
+
+normaliseRange' :: (Time, Time) -> (Time, Time)
+normaliseRange' r@(s, d) | d < 0 = (s + d, 0 - d)
+                         | otherwise = r
+
+
 squashSignal :: Int -> (Int, Signal a) -> Signal a
 squashSignal n (i, p@(Signal _)) = Signal $ f
   where f t | (t - sam t) >= t' && (t - sam t) < (t'+d') = (at p) $ scaleIn t
@@ -138,20 +149,19 @@ bits (_, Just 0) = []
 bits (o, Just d) = (o, Just d'):bits (o+d',Just (d-d'))
   where d' = min ((fromIntegral $ (floor o) + 1) - o) d
 
-(Sequence fs) <~> (Signal xs) = 
-  Sequence $ \r -> concatMap (\((o,d), f) -> 
-                               map (\x -> ((o,d), f x)) (xs o)) (fs r)
-
 infixl 4 <~>
+(<~>) :: Pattern p => Sequence (a -> b) -> p a -> Sequence b
+(Sequence fs) <~> xs = 
+  Sequence $ \r -> concatMap (\((o,d), f) -> 
+                               map 
+                               (\x -> ((o,d), f x))
+                               (at (toSignal xs) o)
+                             ) (fs r)
 
 {-
   (Signal fs) <*> px@(Sequence _) = 
     Signal $ \t -> concatMap (\(_, x) -> map (\f -> f x) (fs t)) (range px (t,Nothing))
 -}
-
---listToSeq :: [a] -> Pattern a
---listToSeq = cat . map atom
-
 
 sam :: Time -> Time
 sam = fromIntegral . floor
@@ -176,21 +186,15 @@ mapEvents f (Sequence a) = Sequence $ \r -> map f (a r)
 (~>) :: Pattern p => Time -> p a -> p a
 (~>) t p = mapTimeOut (subtract t) $ mapTime (+ t) p
 
--- Maps time of events from an unmapped time range..  
--- Generally not what you want..
-
---mapEventOnset :: (Time -> Time) -> Sequence a -> Sequence a
---mapEventOnset f p = mapEvents (mapFst f') p
---  where f' (s, d) = (f s, d)
-
-{-
-mapEvents f (Signal a) = Signal $ \t -> map (\x -> snd $ f ((t,0), x)) (a t)
-
--}
-
 slow :: Pattern p => Time -> p a -> p a
 slow 1 p = p
 slow r p = mapTimeOut (* r) $ mapTime (/ r) p
+
+--rev :: Pattern p => p a -> p a
+--rev p = mapTimeOut revT $ mapOnset revT p
+
+--revT :: Time -> Time
+--revT = \t -> sam t + ((fromIntegral $ ceiling t) - t)
 
 density :: Pattern p => Time -> p a -> p a
 density 1 p = p
