@@ -11,6 +11,7 @@ import Control.Concurrent.MVar
 import Pattern
 import Data.Ratio
 --import Control.Exception
+import Parse
 
 import qualified Data.Map as Map
 
@@ -118,7 +119,7 @@ onTick s shape patternM change ticks
        catch (mapM_ (send s) messages) (\msg -> putStrLn $ "oops " ++ show msg)
        return ()
 
-make :: Pattern p => (a -> Datum) -> OscShape -> String -> p a -> (p OscMap)
+make :: ParseablePattern p => (a -> Datum) -> OscShape -> String -> p a -> (p OscMap)
 make toOsc s nm p = fmap (\x -> Map.singleton nParam (defaultV x)) p
   where nParam = param s nm
         defaultV a = Just $ toOsc a
@@ -132,7 +133,7 @@ param :: OscShape -> String -> Param
 param shape n = head $ filter (\x -> name x == n) (params shape)
                 
 -- Merge any pattern with a sequence
-merge :: Pattern p => OscSequence -> p OscMap -> OscSequence
+merge :: ParseablePattern p => OscSequence -> p OscMap -> OscSequence
 merge x y = Map.union <$> x <~> y
 
 infixr 1 ~~

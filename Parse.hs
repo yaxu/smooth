@@ -13,6 +13,15 @@ import Data.Colour.SRGB
 
 import GHC.Exts( IsString(..) )
 
+class (Pattern p) => ParseablePattern p where
+  parsePattern :: Parseable a => String -> p a
+
+instance ParseablePattern Sequence where
+  parsePattern = p
+
+instance ParseablePattern Signal where
+  parsePattern = toSignal . p
+
 class Parseable a where
   p :: String -> Sequence a
 
@@ -33,8 +42,11 @@ type ColourD = Colour Double
 instance Parseable ColourD where
   p = parseRhythm pColour
 
-instance (Parseable a) => IsString (Sequence a) where
-  fromString = p
+instance (ParseablePattern p, Parseable a) => IsString (p a) where
+  fromString = parsePattern
+
+--instance (Parseable a, Pattern p) => IsString (p a) where
+--  fromString = p :: String -> p a
 
 lexer   = P.makeTokenParser haskellDef
 braces  = P.braces lexer
