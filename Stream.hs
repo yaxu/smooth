@@ -34,6 +34,7 @@ data OscShape = OscShape {path :: String,
 type OscMap = Map.Map Param (Maybe Datum)
 
 type OscSequence = Sequence OscMap
+type OscSignal = Signal OscMap
 
 defaultDatum :: Param -> Maybe Datum
 defaultDatum (S _ (Just x)) = Just $ String x
@@ -136,6 +137,15 @@ param shape n = head $ filter (\x -> name x == n) (params shape)
 merge :: ParseablePattern p => OscSequence -> p OscMap -> OscSequence
 merge x y = Map.union <$> x <~> y
 
+merge' :: ParseablePattern p => OscSequence -> p OscMap -> OscSequence
+merge' x y = Map.union <$> x <~> y
+
 infixr 1 ~~
 (~~) = merge
+
+(|+|) :: OscSequence -> OscSequence -> OscSequence
+(|+|) = (~~)
+
+(|+~) :: OscSequence -> OscSignal -> OscSequence
+(|+~) = (~~)
 
