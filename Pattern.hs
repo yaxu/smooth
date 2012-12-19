@@ -131,6 +131,9 @@ cat :: (Pattern p) => [p b] -> p b
 cat ps = combine $ map (squash l) (zip [0..] ps)
   where l = length ps
 
+slowcat :: (Pattern p) => [p b] -> p b
+slowcat ps = slow (fromIntegral $ length ps) $ cat ps
+
 listToPat :: Pattern p => [a] -> p a
 listToPat = cat . map atom
 

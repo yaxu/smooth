@@ -51,11 +51,12 @@ accellerate  = makeF dirt "accellerate"
 sample :: String -> Int -> String
 sample name n = name ++ "/" ++ (show n)
 
-striate :: OscSequence -> Int -> OscSequence
-striate p n = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
+striate :: Int -> OscSequence -> OscSequence
+striate n p = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
   where off i p = p ~~ begin (atom (fromIntegral i / fromIntegral n) :: Sequence Double) ~~ end (atom (fromIntegral (i+1) / fromIntegral n) :: Sequence Double)
         
 striateO :: OscSequence -> Int -> Double -> OscSequence
 striateO p n o = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
   where off i p = p ~~ begin ((atom $ (fromIntegral i / fromIntegral n) + o) :: Sequence Double) ~~ end ((atom $ (fromIntegral (i+1) / fromIntegral n) + o) :: Sequence Double)
 
+metronome = slow 2 $ sound "[odx, [hh]*8]"
