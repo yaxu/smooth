@@ -8,6 +8,7 @@ import Parse
 import Sound.OpenSoundControl
 import qualified Data.Map as Map
 import Control.Concurrent.MVar
+import Visual
 
 dirt :: OscShape
 dirt = OscShape {path = "/play",

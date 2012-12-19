@@ -10,7 +10,6 @@ import Data.Ratio
 import Data.Colour
 import Data.Colour.Names
 import Data.Colour.SRGB
-
 import GHC.Exts( IsString(..) )
 
 class (Pattern p) => ParseablePattern p where

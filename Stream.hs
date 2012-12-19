@@ -3,6 +3,7 @@
 module Stream where
 
 import Data.Maybe
+import Sound.OSC.FD
 import Sound.OpenSoundControl
 import Control.Applicative
 import Network.Netclock.Client
@@ -103,6 +104,13 @@ stream client server name address port shape
   = do patternM <- start client server name address port shape
        return $ \p -> do swapMVar patternM p
                          return ()
+
+streamcallback :: (OscSequence -> IO ()) String -> String -> String -> String -> Int -> OscShape -> IO (OscSequence -> IO ())
+streamcallback callback client server name address port shape 
+  = do f <- stream client server name address port shape
+       let f' p = do callback p
+                     f p
+       return f'
 
 onTick :: UDP -> OscShape -> MVar (OscSequence) -> BpsChange -> Int -> IO ()
 onTick s shape patternM change ticks
