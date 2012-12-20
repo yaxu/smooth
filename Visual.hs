@@ -1,16 +1,10 @@
-{-
-   Lines.hs (adapted from lines.c which is (c) Silicon Graphics, Inc.)
-   Copyright (c) Sven Panne 2002-2005 <sven.panne@aedion.de>
-   This file is part of HOpenGL and distributed under a BSD-style license
-   See the file libraries/GLUT/LICENSE
-
-   This program demonstrates geometric primitives and their attributes.
--}
+module Visual where
 
 import System.Exit ( exitWith, ExitCode(ExitSuccess) )
 import Graphics.UI.GLUT
 import Parse
 import Pattern
+import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.MVar
 import Data.Colour
@@ -20,13 +14,21 @@ import Data.Colour.SRGB
 drawOneLine :: Vertex2 GLfloat -> Vertex2 GLfloat -> IO ()
 drawOneLine p1 p2 = renderPrimitive Lines $ do vertex p1; vertex p2
 
+drawRect :: GLfloat -> GLfloat -> GLfloat -> GLfloat -> IO ()
+drawRect x y x' y' 
+  = renderPrimitive Polygon $ do vertex$Vertex2 x y
+                                 vertex$Vertex2 x y'
+                                 vertex$Vertex2 x' y'
+                                 vertex$Vertex2 x' y
+                                 return ()
+
 myInit :: IO ()
 myInit = do
    clearColor $= Color4 0 0 0 0
    shadeModel $= Flat
 
 w = 1024
-lw = 400
+lw = 150
 
 translatef = translate :: Vector3 GLfloat -> IO ()
 
@@ -40,17 +42,20 @@ drawEvent' _ (_, []) = return ()
 drawEvent' lw' ((t, d), c:cs) 
   = do let (Data.Colour.SRGB.RGB r g b) = toSRGB c
        color (Color3 r g b)
-       drawOneLine (Vertex2 (w * (fromRational t)) y) (Vertex2 (w * (fromRational $ t+d)) y)
+       --drawOneLine (Vertex2 (w * (fromRational t)) y) (Vertex2 (w * (fromRational $ t+d)) y)
+       drawRect (w * (fromRational t)) 0 (w * (fromRational $ t+d)) lw'
        translatef (Vector3 0 (lw') 0)
        drawEvent' lw' ((t,d), cs)
   where y = (lw'/2)
 
-display :: (MVar (Sequence ColourD)) -> DisplayCallback
-display mv = do
+display :: MVar Rational -> MVar (Sequence ColourD) -> DisplayCallback
+display t mv = do
    clear [ ColorBuffer ]
+   ticks <- readMVar t
    p <-readMVar mv
-   mapM_ drawEvent (range (segment p) (0, Just 1))
+   mapM_ drawEvent (map (mapFst (\(t,d) -> ((t - (ticks/2))/speed,d/speed))) $ range (segment p) ((ticks/2), Just speed))
    flush
+   where speed = 4
 
 reshape :: ReshapeCallback
 reshape size@(Size w h) = do
@@ -71,17 +76,18 @@ animate = do
 
 --  Request double buffer display mode.
 --  Register mouse input callback functions
-start :: IO (MVar (Sequence ColourD))
-start = do initialize "smooth" []
-           initialDisplayMode $= [ SingleBuffered, RGBMode ]
-           initialWindowSize $= Size 1024 400
-           initialWindowPosition $= Position 100 100
-           createWindow "smooth"
-           myInit
-           mp <- newMVar (p "[white [red, [green orange] blue] red, tomato yellow]")
-           displayCallback $= (display mp)
-           addTimerCallback 100 $ animate  -- refresh every 1/10sec
-           reshapeCallback $= Just reshape
-           keyboardMouseCallback $= Just keyboard
-           forkIO $ mainLoop
-           return mp
+startVis :: MVar Rational -> IO (MVar (Sequence ColourD))
+startVis t = 
+  do initialize "smooth" []
+     initialDisplayMode $= [ SingleBuffered, RGBMode ]
+     initialWindowSize $= Size 1024 150
+     initialWindowPosition $= Position 100 100
+     createWindow "smooth"
+     myInit
+     mp <- newMVar (pure black)
+     displayCallback $= (display t mp)
+     addTimerCallback 80 $ animate
+     reshapeCallback $= Just reshape
+     keyboardMouseCallback $= Just keyboard
+     forkIO $ mainLoop
+     return mp

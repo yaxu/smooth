@@ -105,7 +105,7 @@ stream client server name address port shape
        return $ \p -> do swapMVar patternM p
                          return ()
 
-streamcallback :: (OscSequence -> IO ()) String -> String -> String -> String -> Int -> OscShape -> IO (OscSequence -> IO ())
+streamcallback :: (OscSequence -> IO ()) -> String -> String -> String -> String -> Int -> OscShape -> IO (OscSequence -> IO ())
 streamcallback callback client server name address port shape 
   = do f <- stream client server name address port shape
        let f' p = do callback p
@@ -127,6 +127,14 @@ onTick s shape patternM change ticks
        --putStrLn $ "tick " ++ show ticks ++ " = " ++ show messages
        catch (mapM_ (sendOSC s) messages) (\msg -> putStrLn $ "oops " ++ show msg)
        return ()
+
+ticker :: IO (MVar Rational)
+ticker = do mv <- newMVar 0
+            forkIO $ clocked "ticker" "127.0.0.1" "127.0.0.1" tpb (f mv)
+            return mv
+  where f mv change ticks = do swapMVar mv ((fromIntegral ticks) / (fromIntegral tpb))
+                               return ()
+        tpb = 32
 
 make :: ParseablePattern p => (a -> Datum) -> OscShape -> String -> p a -> (p OscMap)
 make toOsc s nm p = fmap (\x -> Map.singleton nParam (defaultV x)) p
