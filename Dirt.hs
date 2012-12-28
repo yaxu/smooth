@@ -58,4 +58,4 @@ striateO :: OscSequence -> Int -> Double -> OscSequence
 striateO p n o = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
   where off i p = p ~~ begin ((atom $ (fromIntegral i / fromIntegral n) + o) :: Sequence Double) ~~ end ((atom $ (fromIntegral (i+1) / fromIntegral n) + o) :: Sequence Double)
 
-metronome = slow 2 $ sound "[odx, [hh]*8]"
+metronome = slow 2 $ sound (p "[odx, [hh]*8]")
