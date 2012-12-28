@@ -28,7 +28,8 @@ dirt = OscShape {path = "/play",
                             S "vowel" (Just ""),
                             F "cutoff" (Just 0),
                             F "resonance" (Just 0),
-                            F "accellerate" (Just 0)
+                            F "accellerate" (Just 0),
+                            F "shape" (Just 0)
                           ],
                  timestamp = True
                 }
@@ -80,6 +81,7 @@ vowel        = makeS dirt "vowel"
 cutoff       = makeF dirt "cutoff"
 resonance    = makeF dirt "resonance"
 accellerate  = makeF dirt "accellerate"
+shape        = makeF dirt "shape"
 
 sample :: String -> Int -> String
 sample name n = name ++ "/" ++ (show n)
