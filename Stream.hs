@@ -75,13 +75,13 @@ toMessage s change ticks (o, m) =
          logicalNow = (logicalTime change beat)
          beat' = (fromIntegral ticks + 1) / fromIntegral tpb
          logicalPeriod = (logicalTime change (beat + 1)) - logicalNow
-         logicalOnset = logicalNow + (logicalPeriod * o) + latency
+         logicalOnset = ntpr_to_ut $ logicalNow + (logicalPeriod * o) + latency
          sec = floor logicalOnset
          usec = floor $ 1000000 * (logicalOnset - (fromIntegral sec))
          oscdata = catMaybes $ mapMaybe (\x -> Map.lookup x m') (params s)
          oscdata' = ((Int sec):(Int usec):oscdata)
          osc | timestamp s = Bundle (immediately) [Message (path s) oscdata']
-             | otherwise = Bundle (UTCr logicalOnset) [Message (path s) oscdata]
+             | otherwise = Bundle (immediately) [Message (path s) oscdata]
      return osc
 
 
