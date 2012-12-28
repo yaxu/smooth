@@ -18,6 +18,7 @@ drawRect :: GLfloat -> GLfloat -> GLfloat -> GLfloat -> IO ()
 drawRect x y x' y' 
   = renderPrimitive Polygon $ do vertex$Vertex2 x y
                                  vertex$Vertex2 x y'
+                                 currentColor $= Color4 0 0 0 1
                                  vertex$Vertex2 x' y'
                                  vertex$Vertex2 x' y
                                  return ()
@@ -25,7 +26,7 @@ drawRect x y x' y'
 myInit :: IO ()
 myInit = do
    clearColor $= Color4 0 0 0 0
-   shadeModel $= Flat
+   shadeModel $= Smooth
 
 w = 1024
 lw = 150
@@ -55,7 +56,7 @@ display t mv = do
    p <-readMVar mv
    mapM_ drawEvent (map (mapFst (\(t,d) -> ((t - (ticks/2))/speed,d/speed))) $ range (segment p) ((ticks/2), Just speed))
    flush
-   where speed = 4
+   where speed = 2
 
 reshape :: ReshapeCallback
 reshape size@(Size w h) = do
@@ -63,7 +64,6 @@ reshape size@(Size w h) = do
    matrixMode $= Projection
    loadIdentity
    ortho2D 0 (fromIntegral w) 0 (fromIntegral h)
-   -- the following line is not in the original example, but it's good style...
    matrixMode $= Modelview 0
 
 keyboard :: KeyboardMouseCallback
