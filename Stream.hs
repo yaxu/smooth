@@ -81,7 +81,7 @@ toMessage s change ticks (o, m) =
          oscdata = catMaybes $ mapMaybe (\x -> Map.lookup x m') (params s)
          oscdata' = ((Int sec):(Int usec):oscdata)
          osc | timestamp s = Bundle (immediately) [Message (path s) oscdata']
-             | otherwise = Bundle (UTCr logicalOnset) [Message (path s) oscdata]
+             | otherwise = Bundle (ut_to_ntpr logicalOnset) [Message (path s) oscdata]
      return osc
 
 
