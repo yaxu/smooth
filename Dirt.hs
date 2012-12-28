@@ -7,7 +7,14 @@ import Pattern
 import Parse
 import Sound.OpenSoundControl
 import qualified Data.Map as Map
+import Control.Applicative
 import Control.Concurrent.MVar
+import Visual
+import Data.Colour.SRGB
+import Data.Colour.Names
+import Data.Hashable
+import Data.Bits
+import Data.Maybe
 
 dirt :: OscShape
 dirt = OscShape {path = "/play",
@@ -35,6 +42,33 @@ dirt = OscShape {path = "/play",
 
 dirtstream name = stream "127.0.0.1" "127.0.0.1" name "127.0.0.1" 7771 dirt
 
+dirtToColour :: OscSequence -> Sequence ColourD
+dirtToColour p = s
+  where s = fmap (\x -> maybe black (maybe black datumToColour) (Map.lookup (param dirt "sound") x)) p
+
+datumToColour :: Datum -> ColourD
+datumToColour = stringToColour . show
+
+stringToColour :: String -> ColourD
+stringToColour s = sRGB (r/256) (g/256) (b/256)
+  where i = (hash s) `mod` 16777216
+        r = fromIntegral $ (i .&. 0xFF0000) `shiftR` 16;
+        g = fromIntegral $ (i .&. 0x00FF00) `shiftR` 8;
+        b = fromIntegral $ (i .&. 0x0000FF);
+
+
+visualcallback :: IO (OscSequence -> IO ())
+visualcallback = do t <- ticker
+                    mv <- startVis t
+                    let f p = do let p' = dirtToColour p
+                                 swapMVar mv p'
+                                 return ()
+                    return f
+
+dirtyvisualstream name = do cb <- visualcallback
+                            streamcallback cb "127.0.0.1" "127.0.0.1" name "127.0.0.1" 7771 dirt
+                            
+
 sound        = makeS dirt "sound"
 offset       = makeF dirt "offset"
 begin        = makeF dirt "begin"
@@ -59,3 +93,4 @@ striateO p n o = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
   where off i p = p ~~ begin ((atom $ (fromIntegral i / fromIntegral n) + o) :: Sequence Double) ~~ end ((atom $ (fromIntegral (i+1) / fromIntegral n) + o) :: Sequence Double)
 
 metronome = slow 2 $ sound (p "[odx, [hh]*8]")
+

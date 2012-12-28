@@ -9,6 +9,7 @@ import Data.Maybe
 import Data.Ratio
 import Debug.Trace
 import Data.Typeable
+import Data.Function
 
 type Time = Rational
 type Arc = (Time, Time)
@@ -17,9 +18,8 @@ type Range = (Time, Maybe Time)
 type Event a = (Arc, a)
 
 data Sequence a = Sequence {range :: Range -> [Event a]}
-                deriving (Typeable)
+
 data Signal a = Signal {at :: Time -> [a]}
-              deriving (Typeable)
 
 instance (Show a) => Show (Sequence a) where
   show p@(Sequence _) = show $ range p (0, Just 1)
@@ -160,7 +160,6 @@ infixl 4 <~>
                                (\x -> ((o,d), f x))
                                (at (toSignal xs) o)
                              ) (fs r)
-
 {-
   (Signal fs) <*> px@(Sequence _) = 
     Signal $ \t -> concatMap (\(_, x) -> map (\f -> f x) (fs t)) (range px (t,Nothing))
@@ -192,6 +191,15 @@ mapEvents f (Sequence a) = Sequence $ \r -> map f (a r)
 slow :: Pattern p => Time -> p a -> p a
 slow 1 p = p
 slow r p = mapTimeOut (* r) $ mapTime (/ r) p
+
+
+revT :: (Time, Time) -> (Time, Time)
+revT (s, d) = (s', d)
+  where sam' = sam s
+        x = s - sam'
+        y = sam' - x - d
+        z = y + d
+        s' = y + (z - s)
 
 --rev :: Pattern p => p a -> p a
 --rev p = mapTimeOut revT $ mapOnset revT p
@@ -237,4 +245,24 @@ mapSnd f (x,y) = (x,f y)
 
 mapSnds :: (a -> b) -> [(c, a)] -> [(c, b)]
 mapSnds = fmap . mapSnd
+
+segment :: Sequence a -> Sequence [a]
+segment p = Sequence $ \r -> groupByTime (segment' (range p r))
+
+segment' :: [Event a] -> [Event a]
+segment' es = foldr split es pts
+  where pts = nub $ points es
+
+groupByTime :: [Event a] -> [Event [a]]
+groupByTime es = map mrg $ groupBy ((==) `on` fst) $ sortBy (compare `on` fst) es
+  where mrg es@((a, _):_) = (a, map snd es)
+
+split :: Time -> [Event a] -> [Event a]
+split _ [] = []
+split t ((e@((s,d), v)):es) | t > s && t < s+d = ((s,t-s),v):((t,(s+d)-t),v):(split t es)
+                            | otherwise = e:split t es
+
+points :: [Event a] -> [Time]
+points [] = []
+points (((s,d), _):es) = s:(s+d):(points es)
 
