@@ -36,6 +36,9 @@ instance Parseable Bool where
 instance Parseable Int where
   p = parseRhythm pInt
 
+instance Parseable Rational where
+  p = parseRhythm pRational
+
 type ColourD = Colour Double
 
 instance Parseable ColourD where
@@ -159,6 +162,10 @@ pRatio = do n <- natural <?> "numerator"
                  <|>
                  return 1
             return $ n % d
+
+pRational :: Parser (Sequence Rational)
+pRational = do r <- pRatio
+               return $ atom r
 
 pDensity :: Parser (Rational)
 pDensity = angles (pRatio <?> "ratio")
