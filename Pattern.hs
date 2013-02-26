@@ -266,3 +266,5 @@ points :: [Event a] -> [Time]
 points [] = []
 points (((s,d), _):es) = s:(s+d):(points es)
 
+nubSeq :: Eq a => Sequence a -> Sequence a
+nubSeq p = Sequence $ \r -> nub (range p r)
