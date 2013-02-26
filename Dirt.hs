@@ -90,6 +90,12 @@ striate :: Int -> OscSequence -> OscSequence
 striate n p = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
   where off i p = p ~~ begin (atom (fromIntegral i / fromIntegral n) :: Sequence Double) ~~ end (atom (fromIntegral (i+1) / fromIntegral n) :: Sequence Double)
         
+striate' :: Int -> Double -> OscSequence -> OscSequence
+striate' n f p = slowcat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
+  where off i p = p ~~ begin (atom (slot * i) :: Sequence Double) ~~ end (atom ((slot * i) + f) :: Sequence Double)
+        slot = (1 - f) / (fromIntegral n)
+
+
 striateO :: OscSequence -> Int -> Double -> OscSequence
 striateO p n o = cat $ map (\x -> off (fromIntegral x) p) [0 .. n-1]
   where off i p = p ~~ begin ((atom $ (fromIntegral i / fromIntegral n) + o) :: Sequence Double) ~~ end ((atom $ (fromIntegral (i+1) / fromIntegral n) + o) :: Sequence Double)
